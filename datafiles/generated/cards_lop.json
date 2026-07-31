@@ -1,0 +1,310 @@
+{
+  "schema_version": 1,
+  "generated_from": "boardgamefiles/chozoreference.xlsx",
+  "sheet": "Set2",
+  "pool": "lop",
+  "unique_count": 9,
+  "copy_count": 22,
+  "cards": [
+    {
+      "id": "lop.corrupt_rundas",
+      "set": "LOP",
+      "pool": "lop",
+      "count": 2,
+      "name": "Corrupt Rundas",
+      "type": "character",
+      "faction_code": "BHPZ",
+      "factions": [
+        "BH",
+        "PZ"
+      ],
+      "tags": [
+        "Phazon",
+        "Bounty Hunter"
+      ],
+      "image": "prundas",
+      "effect": "Corrupt Rundas is deployed with 3 Phazon tokens",
+      "stat": {
+        "kind": "strength",
+        "value": 5
+      },
+      "costs": {
+        "deploy": 5,
+        "reserve": 3
+      },
+      "flavor": null,
+      "dual": true,
+      "layout": "default",
+      "source": {
+        "sheet": "Set2",
+        "row": 2
+      }
+    },
+    {
+      "id": "lop.corrupt_gandrayda",
+      "set": "LOP",
+      "pool": "lop",
+      "count": 2,
+      "name": "Corrupt Gandrayda",
+      "type": "character",
+      "faction_code": "BHPZ",
+      "factions": [
+        "BH",
+        "PZ"
+      ],
+      "tags": [
+        "Phazon",
+        "Bounty Hunter"
+      ],
+      "image": "pgandrayda",
+      "effect": "@[cost,2]: Exhaust target card. Corrupt Gandrayda becomes a copy of that card and it gains an extra Phazon token.",
+      "stat": {
+        "kind": "strength",
+        "value": 2
+      },
+      "costs": {
+        "deploy": 5,
+        "reserve": 3
+      },
+      "flavor": null,
+      "dual": true,
+      "layout": "default",
+      "source": {
+        "sheet": "Set2",
+        "row": 3
+      }
+    },
+    {
+      "id": "lop.dark_samus",
+      "set": "LOP",
+      "pool": "lop",
+      "count": 2,
+      "name": "Dark Samus",
+      "type": "character",
+      "faction_code": "PZ",
+      "factions": [
+        "PZ"
+      ],
+      "tags": [
+        "Phazon"
+      ],
+      "image": "darksamus",
+      "effect": "@[cost,1]@[ex]: Remove all Phazon tokens from this card. Discard a character with strength less than or equal to the number removed",
+      "stat": {
+        "kind": "strength",
+        "value": 2
+      },
+      "costs": {
+        "deploy": 6,
+        "reserve": 4
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Set2",
+        "row": 4
+      }
+    },
+    {
+      "id": "lop.leviathan",
+      "set": "LOP",
+      "pool": "lop",
+      "count": 2,
+      "name": "Leviathan",
+      "type": "ship",
+      "faction_code": "PZ",
+      "factions": [
+        "PZ"
+      ],
+      "tags": [
+        "Phazon"
+      ],
+      "image": "Elysia_leviathan",
+      "effect": "This card does not ready at start of turn\n@[cost,1]@[ex]: Attach to any player's location . While attached, that card gains a phazon token and exhausts at the end of each turn",
+      "stat": {
+        "kind": "security",
+        "value": 0
+      },
+      "costs": {
+        "deploy": 4,
+        "reserve": 2
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "ship",
+      "source": {
+        "sheet": "Set2",
+        "row": 5
+      }
+    },
+    {
+      "id": "lop.leviathan_battleship",
+      "set": "LOP",
+      "pool": "lop",
+      "count": 4,
+      "name": "Leviathan Battleship",
+      "type": "ship",
+      "faction_code": "SPPZ",
+      "factions": [
+        "SP",
+        "PZ"
+      ],
+      "tags": [
+        "Phazon",
+        "Space Pirate"
+      ],
+      "image": "leviathan_wormhole_3",
+      "effect": "Any Metroids on board this ship at the end of turn are replaced with Hunter Metroids",
+      "stat": {
+        "kind": "security",
+        "value": 4
+      },
+      "costs": {
+        "deploy": 6,
+        "reserve": 4
+      },
+      "flavor": null,
+      "dual": true,
+      "layout": "ship",
+      "source": {
+        "sheet": "Set2",
+        "row": 6
+      }
+    },
+    {
+      "id": "lop.chozo_ghosts",
+      "set": "LOP",
+      "pool": "lop",
+      "count": 2,
+      "name": "Chozo Ghosts",
+      "type": "character",
+      "faction_code": "CZPZ",
+      "factions": [
+        "CZ",
+        "PZ"
+      ],
+      "tags": [
+        "Phazon",
+        "Chozo",
+        "Thoha"
+      ],
+      "image": "chozo_ghosts",
+      "effect": null,
+      "stat": {
+        "kind": "strength",
+        "value": 1
+      },
+      "costs": {
+        "deploy": 4,
+        "reserve": 2
+      },
+      "flavor": "Their aggressive and erratic behaviour is most likely due to the corrupting effects of Phazon in the Tallon IV environment.",
+      "dual": true,
+      "layout": "default",
+      "source": {
+        "sheet": "Set2",
+        "row": 7
+      }
+    },
+    {
+      "id": "lop.hive_mind_communication",
+      "set": "LOP",
+      "pool": "lop",
+      "count": 2,
+      "name": "Hive Mind Communication",
+      "type": "event",
+      "faction_code": "PZ",
+      "factions": [
+        "PZ"
+      ],
+      "tags": [
+        "Phazon",
+        "Event"
+      ],
+      "image": "phazonhive",
+      "effect": "+2 CP, all characters you control get a Phazon token",
+      "stat": {
+        "kind": null,
+        "value": null
+      },
+      "costs": {
+        "deploy": null,
+        "reserve": 4
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Set2",
+        "row": 8
+      }
+    },
+    {
+      "id": "lop.aurora_unit_217",
+      "set": "LOP",
+      "pool": "lop",
+      "count": 2,
+      "name": "Aurora Unit 217",
+      "type": "character",
+      "faction_code": "GFPZ",
+      "factions": [
+        "GF",
+        "PZ"
+      ],
+      "tags": [
+        "Phazon",
+        "Galactic Federation"
+      ],
+      "image": "aurora217",
+      "effect": "@[ex]: Attach to a ship. Attached ship has +1 Security and \"Phazon\" type\n@[des]: All ships and characters get 3 Phazon tokens",
+      "stat": {
+        "kind": "strength",
+        "value": 3
+      },
+      "costs": {
+        "deploy": 7,
+        "reserve": 4
+      },
+      "flavor": "\"Aurora Unit 217 offline. Phazon corruption present. Administer vaccine to repair.\"",
+      "dual": true,
+      "layout": "default",
+      "source": {
+        "sheet": "Set2",
+        "row": 9
+      }
+    },
+    {
+      "id": "lop.p_e_d_suit",
+      "set": "LOP",
+      "pool": "lop",
+      "count": 4,
+      "name": "P.E.D. Suit",
+      "type": "character",
+      "faction_code": "GF",
+      "factions": [
+        "GF"
+      ],
+      "tags": [
+        "Galactic Federation"
+      ],
+      "image": "ped",
+      "effect": "@[ex]: Attach to another character. Attached character has:\n\"@[cost,2]: Remove all phazon tokens from this card, +1 Strength for each token removed until end of turn\"",
+      "stat": {
+        "kind": "strength",
+        "value": 0
+      },
+      "costs": {
+        "deploy": 5,
+        "reserve": 3
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Set2",
+        "row": 10
+      }
+    }
+  ]
+}

@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "generated_from": "boardgamefiles/chozoreference.xlsx",
+  "sheet": "Metroids",
+  "pool": "metroids",
+  "unique_count": 6,
+  "copy_count": 60,
+  "metroids": [
+    {
+      "id": "metroid.larva",
+      "set": "LOC",
+      "count": 10,
+      "alias": "Metroid Larva",
+      "name": "Larva",
+      "stage": 1,
+      "stage_key": "1",
+      "hazard": 1,
+      "research_value": 0.5,
+      "effect": null,
+      "flavor": "A larva's physiology is mostly identical to an Infant's, however, its size has grown considerably.",
+      "phazon": false,
+      "source": {
+        "sheet": "Metroids",
+        "row": 2
+      }
+    },
+    {
+      "id": "metroid.alpha",
+      "set": "LOC",
+      "count": 10,
+      "alias": "Alpha Metroid",
+      "name": "Alpha",
+      "stage": 2,
+      "stage_key": "2",
+      "hazard": 2,
+      "research_value": 1.5,
+      "effect": null,
+      "flavor": "The Metroid is now visually akin to an arthropod, though its insect-like legs have not reached their full length and size, thus preventing their use for ground locomotion.",
+      "phazon": false,
+      "source": {
+        "sheet": "Metroids",
+        "row": 3
+      }
+    },
+    {
+      "id": "metroid.gamma",
+      "set": "LOC",
+      "count": 10,
+      "alias": "Gamma Metroid",
+      "name": "Gamma",
+      "stage": 3,
+      "stage_key": "3",
+      "hazard": 3,
+      "research_value": 2,
+      "effect": null,
+      "flavor": "This stage is an expansion to the prior form. The four legs have fully developed, allowing it to walk along the ground while still maintaining its ability to fly.",
+      "phazon": false,
+      "source": {
+        "sheet": "Metroids",
+        "row": 4
+      }
+    },
+    {
+      "id": "metroid.zeta",
+      "set": "LOC",
+      "count": 10,
+      "alias": "Zeta Metroid",
+      "name": "Zeta",
+      "stage": 4,
+      "stage_key": "4",
+      "hazard": 4,
+      "research_value": 4,
+      "effect": null,
+      "flavor": "The Metroid's body drastically transforms for a second time, and at this point shares many traits with that of a quadrupedal, theropod dinosaur.",
+      "phazon": false,
+      "source": {
+        "sheet": "Metroids",
+        "row": 5
+      }
+    },
+    {
+      "id": "metroid.omega",
+      "set": "LOC",
+      "count": 10,
+      "alias": "Omega Metroid",
+      "name": "Omega",
+      "stage": 5,
+      "stage_key": "5",
+      "hazard": 5,
+      "research_value": 6,
+      "effect": "If no ship contributes strength during a Containment Check, this metroid automatically breaches",
+      "flavor": "The final and most powerful form of a standard Metroid. Now standing in a bipedal posture, the Omega Metroid sacrifices the mobility of the previous stage for increased size and strength.",
+      "phazon": false,
+      "source": {
+        "sheet": "Metroids",
+        "row": 6
+      }
+    },
+    {
+      "id": "metroid.hunter",
+      "set": "LOP",
+      "count": 10,
+      "alias": "Hunter Metroid",
+      "name": "Hunter",
+      "stage": null,
+      "stage_key": "x",
+      "hazard": 1,
+      "research_value": 1,
+      "effect": "This metroid breaches before other stages. If it breaches, all characters you control get a Phazon token",
+      "flavor": null,
+      "phazon": true,
+      "source": {
+        "sheet": "Metroids",
+        "row": 7
+      }
+    }
+  ]
+}

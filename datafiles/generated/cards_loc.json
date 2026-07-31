@@ -1,0 +1,1303 @@
+{
+  "schema_version": 1,
+  "generated_from": "boardgamefiles/chozoreference.xlsx",
+  "sheet": "Cards",
+  "pool": "loc",
+  "unique_count": 40,
+  "copy_count": 105,
+  "cards": [
+    {
+      "id": "loc.gandrayda",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 2,
+      "name": "Gandrayda",
+      "type": "character",
+      "faction_code": "BH",
+      "factions": [
+        "BH"
+      ],
+      "tags": [
+        "Bounty Hunter"
+      ],
+      "image": "gandrayda",
+      "effect": "@[cost,1]: Select another character any player controls - Until end of turn Gandrayda becomes a copy of that character",
+      "stat": {
+        "kind": "strength",
+        "value": 2
+      },
+      "costs": {
+        "deploy": 5,
+        "reserve": 3
+      },
+      "flavor": "\"You know, you should never trust strangers, Sammy.\"",
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Cards",
+        "row": 2
+      }
+    },
+    {
+      "id": "loc.rundas",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 2,
+      "name": "Rundas",
+      "type": "character",
+      "faction_code": "BH",
+      "factions": [
+        "BH"
+      ],
+      "tags": [
+        "Bounty Hunter"
+      ],
+      "image": "rundas",
+      "effect": "@[cost,1]@[ex]: Exhaust target character\n\n@[cost,2]@[ex]: Exhaust target ship",
+      "stat": {
+        "kind": "strength",
+        "value": 2
+      },
+      "costs": {
+        "deploy": 5,
+        "reserve": 3
+      },
+      "flavor": "\"Hey, relax! We're the good guys! Justice will prevail and all that stuff... right, Samus?\"",
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Cards",
+        "row": 3
+      }
+    },
+    {
+      "id": "loc.ghor",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 2,
+      "name": "Ghor",
+      "type": "character",
+      "faction_code": "BH",
+      "factions": [
+        "BH"
+      ],
+      "tags": [
+        "Bounty Hunter"
+      ],
+      "image": "ghor",
+      "effect": "@[cost,1]@[des]: Deploy target ship directly from the shop, bypassing cost",
+      "stat": {
+        "kind": "strength",
+        "value": 2
+      },
+      "costs": {
+        "deploy": 5,
+        "reserve": 3
+      },
+      "flavor": "\"Don't you feel the power? Soon everything will be corrupted. Including you!\"",
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Cards",
+        "row": 4
+      }
+    },
+    {
+      "id": "loc.samus_aran",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 2,
+      "name": "Samus Aran",
+      "type": "character",
+      "faction_code": "BHCZ",
+      "factions": [
+        "BH",
+        "CZ"
+      ],
+      "tags": [
+        "Chozo",
+        "Bounty Hunter"
+      ],
+      "image": "samus_aran",
+      "effect": "@[ex]: Target ship has +2 security this turn\n\n@[cost,1]: +1 Strength for defending against raids",
+      "stat": {
+        "kind": "strength",
+        "value": 2
+      },
+      "costs": {
+        "deploy": 5,
+        "reserve": 3
+      },
+      "flavor": "Mission Accomplished",
+      "dual": true,
+      "layout": "default",
+      "source": {
+        "sheet": "Cards",
+        "row": 5
+      }
+    },
+    {
+      "id": "loc.quiet_robe",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 4,
+      "name": "Quiet Robe",
+      "type": "character",
+      "faction_code": "CZ",
+      "factions": [
+        "CZ"
+      ],
+      "tags": [
+        "Chozo",
+        "Thoha"
+      ],
+      "image": "chozocolonist",
+      "effect": "@[cost,1]@[ex]: Place two metroids from SR388 on to a ready ship you control. The sum of these two metroids level must be less than or equal to the security of the ship chosen.",
+      "stat": {
+        "kind": "strength",
+        "value": 1
+      },
+      "costs": {
+        "deploy": 3,
+        "reserve": 2
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Cards",
+        "row": 6
+      }
+    },
+    {
+      "id": "loc.gray_voice",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 2,
+      "name": "Gray Voice",
+      "type": "character",
+      "faction_code": "CZ",
+      "factions": [
+        "CZ"
+      ],
+      "tags": [
+        "Chozo",
+        "Thoha"
+      ],
+      "image": "grayvoice",
+      "effect": "While ready: Capturing costs -1 CP",
+      "stat": {
+        "kind": "strength",
+        "value": 2
+      },
+      "costs": {
+        "deploy": 5,
+        "reserve": 3
+      },
+      "flavor": "\"There is no need for us to fight.\"",
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Cards",
+        "row": 7
+      }
+    },
+    {
+      "id": "loc.chozo_warrior",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 4,
+      "name": "Chozo Warrior",
+      "type": "character",
+      "faction_code": "CZ",
+      "factions": [
+        "CZ"
+      ],
+      "tags": [
+        "Chozo",
+        "Mawkin"
+      ],
+      "image": "chozo_soldiers",
+      "effect": "While ready: Raids cost -1 CP",
+      "stat": {
+        "kind": "strength",
+        "value": 1
+      },
+      "costs": {
+        "deploy": 3,
+        "reserve": 2
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Cards",
+        "row": 8
+      }
+    },
+    {
+      "id": "loc.raven_beak",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 2,
+      "name": "Raven Beak",
+      "type": "character",
+      "faction_code": "CZ",
+      "factions": [
+        "CZ"
+      ],
+      "tags": [
+        "Chozo",
+        "Mawkin"
+      ],
+      "image": "raven_beak",
+      "effect": "@[cost,2]@[ex]: Discard 1 character controlled by any player",
+      "stat": {
+        "kind": "strength",
+        "value": 3
+      },
+      "costs": {
+        "deploy": 6,
+        "reserve": 4
+      },
+      "flavor": "\"Foolish daughter... Leave the galaxy to me. Close your eyes and rest.\"",
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Cards",
+        "row": 9
+      }
+    },
+    {
+      "id": "loc.body_adaptation_machine",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 2,
+      "name": "Body Adaptation Machine",
+      "type": "character",
+      "faction_code": "CZ",
+      "factions": [
+        "CZ"
+      ],
+      "tags": [
+        "Chozo"
+      ],
+      "image": "bodyadapt",
+      "effect": "@[cost,1]: Attach Body Adaptation Machine to a character you control and declare a faction. It now has that faction in addition to its other faction(s)",
+      "stat": {
+        "kind": "strength",
+        "value": 0
+      },
+      "costs": {
+        "deploy": 4,
+        "reserve": 2
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Cards",
+        "row": 10
+      }
+    },
+    {
+      "id": "loc.gf_soldier",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 2,
+      "name": "GF Soldier",
+      "type": "character",
+      "faction_code": "GF",
+      "factions": [
+        "GF"
+      ],
+      "tags": [
+        "Galactic Federation"
+      ],
+      "image": "Metroid_Other_M_Federation_Soldiers",
+      "effect": "@[cost,1]@[ex]: Target ship has +1 Security this turn",
+      "stat": {
+        "kind": "strength",
+        "value": 1
+      },
+      "costs": {
+        "deploy": 3,
+        "reserve": 2
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Cards",
+        "row": 11
+      }
+    },
+    {
+      "id": "loc.gf_marine",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 4,
+      "name": "GF Marine",
+      "type": "character",
+      "faction_code": "GF",
+      "factions": [
+        "GF"
+      ],
+      "tags": [
+        "Galactic Federation"
+      ],
+      "image": "smythe",
+      "effect": "@[ex]: +1 CP",
+      "stat": {
+        "kind": "strength",
+        "value": 1
+      },
+      "costs": {
+        "deploy": 4,
+        "reserve": 2
+      },
+      "flavor": "Federation Marines wear advanced suits of powered armor, allowing them to use potent weapons and resist heavy damage in battle.",
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Cards",
+        "row": 12
+      }
+    },
+    {
+      "id": "loc.admiral_dane",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 2,
+      "name": "Admiral Dane",
+      "type": "character",
+      "faction_code": "GF",
+      "factions": [
+        "GF"
+      ],
+      "tags": [
+        "Galactic Federation"
+      ],
+      "image": "admiral_dane",
+      "effect": "@[cost,1]: Ready target ship",
+      "stat": {
+        "kind": "strength",
+        "value": 2
+      },
+      "costs": {
+        "deploy": 5,
+        "reserve": 3
+      },
+      "flavor": "\"Outstanding work, Samus. I don't say this often, but I sure am impressed.\"",
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Cards",
+        "row": 13
+      }
+    },
+    {
+      "id": "loc.adam_malkovich",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 2,
+      "name": "Adam Malkovich",
+      "type": "character",
+      "faction_code": "GF",
+      "factions": [
+        "GF"
+      ],
+      "tags": [
+        "Galactic Federation"
+      ],
+      "image": "adam_malkovich",
+      "effect": "When a breach occurs: You may destroy this card to avoid the breach",
+      "stat": {
+        "kind": "strength",
+        "value": 2
+      },
+      "costs": {
+        "deploy": 5,
+        "reserve": 3
+      },
+      "flavor": "\"Any objections, Lady?\"",
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Cards",
+        "row": 14
+      }
+    },
+    {
+      "id": "loc.researcher",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 2,
+      "name": "Researcher",
+      "type": "character",
+      "faction_code": "NA",
+      "factions": [
+        "NA"
+      ],
+      "tags": [
+        "Neutral"
+      ],
+      "image": "scientist",
+      "effect": "Start of turn: Draw 1 card, then discard 1 card",
+      "stat": {
+        "kind": "strength",
+        "value": 0
+      },
+      "costs": {
+        "deploy": 2,
+        "reserve": 1
+      },
+      "flavor": "I personally delivered it to the Galactic Research Station at Ceres so scientists could study its energy producing qualities…",
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Cards",
+        "row": 15
+      }
+    },
+    {
+      "id": "loc.security_guard",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 4,
+      "name": "Security Guard",
+      "type": "character",
+      "faction_code": "NA",
+      "factions": [
+        "NA"
+      ],
+      "tags": [
+        "Neutral"
+      ],
+      "image": "security",
+      "effect": "+1 CP when you successfully contain a breach",
+      "stat": {
+        "kind": "strength",
+        "value": 1
+      },
+      "costs": {
+        "deploy": 3,
+        "reserve": 2
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Cards",
+        "row": 16
+      }
+    },
+    {
+      "id": "loc.zebesian_pirate",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 4,
+      "name": "Zebesian Pirate",
+      "type": "character",
+      "faction_code": "SP",
+      "factions": [
+        "SP"
+      ],
+      "tags": [
+        "Space Pirate"
+      ],
+      "image": "Mzm078vi",
+      "effect": "Zebesian Pirate's strength is equal to the number of ready 'Space Pirate' cards you control",
+      "stat": {
+        "kind": "strength",
+        "value": "X"
+      },
+      "costs": {
+        "deploy": 3,
+        "reserve": 2
+      },
+      "flavor": "These feared aliens are known as the scourge of the Galaxy. They are known for stealing galactic trading ships and leaving the crews stranded in space.",
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Cards",
+        "row": 17
+      }
+    },
+    {
+      "id": "loc.beam_pirate",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 2,
+      "name": "Beam Pirate",
+      "type": "character",
+      "faction_code": "SP",
+      "factions": [
+        "SP"
+      ],
+      "tags": [
+        "Space Pirate"
+      ],
+      "image": "wave_trooper",
+      "effect": "During containment checks, strength +1",
+      "stat": {
+        "kind": "strength",
+        "value": 2
+      },
+      "costs": {
+        "deploy": 5,
+        "reserve": 3
+      },
+      "flavor": "Space Pirates have reverse-engineered several of your weapons, including the Beam.",
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Cards",
+        "row": 18
+      }
+    },
+    {
+      "id": "loc.mother_brain",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 2,
+      "name": "Mother Brain",
+      "type": "character",
+      "faction_code": "SP",
+      "factions": [
+        "SP"
+      ],
+      "tags": [
+        "Space Pirate"
+      ],
+      "image": "Motherbrain",
+      "effect": "Mother brain has strength equal to the research value of the latest stage Metroid in your lab (rounded up)",
+      "stat": {
+        "kind": "strength",
+        "value": "X"
+      },
+      "costs": {
+        "deploy": 6,
+        "reserve": 4
+      },
+      "flavor": "\"Beyond my existence, there is no value in having the existence of the Chozo. We are only discarding what is useless.\"",
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Cards",
+        "row": 19
+      }
+    },
+    {
+      "id": "loc.torizo",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 4,
+      "name": "Torizo",
+      "type": "event",
+      "faction_code": "CZ",
+      "factions": [
+        "CZ"
+      ],
+      "tags": [
+        "Event"
+      ],
+      "image": "brinstartorizo",
+      "effect": "@[des]: Evolve 1 Metroid in your lab (do not advance the mutation track)",
+      "stat": {
+        "kind": null,
+        "value": null
+      },
+      "costs": {
+        "deploy": null,
+        "reserve": 5
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Cards",
+        "row": 20
+      }
+    },
+    {
+      "id": "loc.sa_x_breaks_out",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 3,
+      "name": "SA-X Breaks Out!",
+      "type": "event",
+      "faction_code": "SP",
+      "factions": [
+        "SP"
+      ],
+      "tags": [
+        "Event"
+      ],
+      "image": "sa-x",
+      "effect": "All players that have at least 1 Metroid breach containment. Apply all consequences regardless of strength level.",
+      "stat": {
+        "kind": null,
+        "value": null
+      },
+      "costs": {
+        "deploy": null,
+        "reserve": 5
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Cards",
+        "row": 21
+      }
+    },
+    {
+      "id": "loc.collision_course",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 3,
+      "name": "Collision Course",
+      "type": "event",
+      "faction_code": "NA",
+      "factions": [
+        "NA"
+      ],
+      "tags": [
+        "Event"
+      ],
+      "image": "BSL_research_station5",
+      "effect": "Return all metroids on SR388 to Metroid Larva stage",
+      "stat": {
+        "kind": null,
+        "value": null
+      },
+      "costs": {
+        "deploy": null,
+        "reserve": 3
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Cards",
+        "row": 22
+      }
+    },
+    {
+      "id": "loc.queen_metroid_awakens",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 3,
+      "name": "Queen Metroid Awakens",
+      "type": "event",
+      "faction_code": "NA",
+      "factions": [
+        "NA"
+      ],
+      "tags": [
+        "Event",
+        "Global"
+      ],
+      "image": "queenmetroid",
+      "effect": "When this card appears in the shop, immediately:\n<al>-All players perform a Containment Check at +2 Hazard\n-Evolve all metroids in SR388\n-Shuffle this card back into the shop deck",
+      "stat": {
+        "kind": null,
+        "value": null
+      },
+      "costs": {
+        "deploy": null,
+        "reserve": null
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Cards",
+        "row": 23
+      }
+    },
+    {
+      "id": "loc.ready_room",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 2,
+      "name": "Ready Room",
+      "type": "location",
+      "faction_code": "BH",
+      "factions": [
+        "BH"
+      ],
+      "tags": [
+        "Bounty Hunter"
+      ],
+      "image": "ready_room_6",
+      "effect": "@[ex]: Refund 1 CP the next time a \"Bounty Hunter\" character activates its ability",
+      "stat": {
+        "kind": null,
+        "value": null
+      },
+      "costs": {
+        "deploy": 4,
+        "reserve": 2
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Cards",
+        "row": 24
+      }
+    },
+    {
+      "id": "loc.zebes",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 2,
+      "name": "Zebes",
+      "type": "location",
+      "faction_code": "CZ",
+      "factions": [
+        "CZ"
+      ],
+      "tags": [
+        "Chozo"
+      ],
+      "image": "zebes",
+      "effect": "\"Chozo\" aligned cards may be deployed and reserved for 1 less CP",
+      "stat": {
+        "kind": null,
+        "value": null
+      },
+      "costs": {
+        "deploy": 4,
+        "reserve": 2
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Cards",
+        "row": 25
+      }
+    },
+    {
+      "id": "loc.galactic_federation_hq",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 2,
+      "name": "Galactic Federation HQ",
+      "type": "location",
+      "faction_code": "GF",
+      "factions": [
+        "GF"
+      ],
+      "tags": [
+        "Galactic Federation"
+      ],
+      "image": "earth",
+      "effect": "@[ex]: The next \"Galactic Federation\" character you exhaust to activate its ability activates twice.",
+      "stat": {
+        "kind": null,
+        "value": null
+      },
+      "costs": {
+        "deploy": 4,
+        "reserve": 2
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Cards",
+        "row": 26
+      }
+    },
+    {
+      "id": "loc.biologic_space_laboratories",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 2,
+      "name": "Biologic Space Laboratories",
+      "type": "location",
+      "faction_code": "NA",
+      "factions": [
+        "NA"
+      ],
+      "tags": [
+        "Neutral"
+      ],
+      "image": "BSL_research_station",
+      "effect": "Both players may use the following ability:\n@[cost,1]@[ex]: Reserve 1 event from the shop for free",
+      "stat": {
+        "kind": null,
+        "value": null
+      },
+      "costs": {
+        "deploy": 4,
+        "reserve": 2
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Cards",
+        "row": 27
+      }
+    },
+    {
+      "id": "loc.space_pirate_homeworld",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 2,
+      "name": "Space Pirate Homeworld",
+      "type": "location",
+      "faction_code": "SP",
+      "factions": [
+        "SP"
+      ],
+      "tags": [
+        "Space Pirate"
+      ],
+      "image": "utraghus",
+      "effect": "@[ex]: Your opponent may pay 1 CP, if they don't, ready one \"Space Pirate\" character",
+      "stat": {
+        "kind": null,
+        "value": null
+      },
+      "costs": {
+        "deploy": 4,
+        "reserve": 2
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Cards",
+        "row": 28
+      }
+    },
+    {
+      "id": "loc.delano_7",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 2,
+      "name": "Delano 7",
+      "type": "ship",
+      "faction_code": "BH",
+      "factions": [
+        "BH"
+      ],
+      "tags": [
+        "Bounty Hunter"
+      ],
+      "image": "delano_7",
+      "effect": "Security +2 when exhausting for breach containment",
+      "stat": {
+        "kind": "security",
+        "value": 3
+      },
+      "costs": {
+        "deploy": 6,
+        "reserve": 4
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "ship",
+      "source": {
+        "sheet": "Cards",
+        "row": 29
+      }
+    },
+    {
+      "id": "loc.gunship",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 4,
+      "name": "Gunship",
+      "type": "ship",
+      "faction_code": "BHCZ",
+      "factions": [
+        "BH",
+        "CZ"
+      ],
+      "tags": [
+        "Chozo",
+        "Bounty Hunter"
+      ],
+      "image": "gunship-mp3",
+      "effect": "When capturing to this ship\n+1 CP",
+      "stat": {
+        "kind": "security",
+        "value": 2
+      },
+      "costs": {
+        "deploy": 4,
+        "reserve": 2
+      },
+      "flavor": null,
+      "dual": true,
+      "layout": "ship",
+      "source": {
+        "sheet": "Cards",
+        "row": 30
+      }
+    },
+    {
+      "id": "loc.chozo_transport",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 3,
+      "name": "Chozo Transport",
+      "type": "ship",
+      "faction_code": "CZ",
+      "factions": [
+        "CZ"
+      ],
+      "tags": [
+        "Chozo",
+        "Thoha"
+      ],
+      "image": "thoha_ship",
+      "effect": "Security +1 when defending against raids",
+      "stat": {
+        "kind": "security",
+        "value": 3
+      },
+      "costs": {
+        "deploy": 5,
+        "reserve": 3
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "ship",
+      "source": {
+        "sheet": "Cards",
+        "row": 31
+      }
+    },
+    {
+      "id": "loc.mawkin_starship",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 3,
+      "name": "Mawkin Starship",
+      "type": "ship",
+      "faction_code": "CZ",
+      "factions": [
+        "CZ"
+      ],
+      "tags": [
+        "Chozo",
+        "Mawkin"
+      ],
+      "image": "mawkin_starship",
+      "effect": "@[cost,3]@[ex]: Discard one card your opponent controls",
+      "stat": {
+        "kind": "security",
+        "value": 2
+      },
+      "costs": {
+        "deploy": 5,
+        "reserve": 3
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "ship",
+      "source": {
+        "sheet": "Cards",
+        "row": 32
+      }
+    },
+    {
+      "id": "loc.g_f_s_tyr",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 4,
+      "name": "G.F.S. Tyr",
+      "type": "ship",
+      "faction_code": "GF",
+      "factions": [
+        "GF"
+      ],
+      "tags": [
+        "Galactic Federation"
+      ],
+      "image": "tyr_model",
+      "effect": "@[ex]: +1 CP",
+      "stat": {
+        "kind": "security",
+        "value": 2
+      },
+      "costs": {
+        "deploy": 5,
+        "reserve": 3
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "ship",
+      "source": {
+        "sheet": "Cards",
+        "row": 33
+      }
+    },
+    {
+      "id": "loc.g_f_s_olympus",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 2,
+      "name": "G.F.S. Olympus",
+      "type": "ship",
+      "faction_code": "GF",
+      "factions": [
+        "GF"
+      ],
+      "tags": [
+        "Galactic Federation"
+      ],
+      "image": "olympus_and_stiletto",
+      "effect": "If this ship exhausts for containment, also ready one Galactic Federation character",
+      "stat": {
+        "kind": "security",
+        "value": 4
+      },
+      "costs": {
+        "deploy": 7,
+        "reserve": 5
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "ship",
+      "source": {
+        "sheet": "Cards",
+        "row": 34
+      }
+    },
+    {
+      "id": "loc.light_shuttle",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 4,
+      "name": "Light Shuttle",
+      "type": "ship",
+      "faction_code": "NA",
+      "factions": [
+        "NA"
+      ],
+      "tags": [
+        "Neutral"
+      ],
+      "image": "defiant",
+      "effect": "--",
+      "stat": {
+        "kind": "security",
+        "value": 1
+      },
+      "costs": {
+        "deploy": 3,
+        "reserve": 1
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "ship",
+      "source": {
+        "sheet": "Cards",
+        "row": 35
+      }
+    },
+    {
+      "id": "loc.b_s_l_ship",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 2,
+      "name": "B.S.L. Ship",
+      "type": "ship",
+      "faction_code": "NA",
+      "factions": [
+        "NA"
+      ],
+      "tags": [
+        "Neutral"
+      ],
+      "image": "ship_final_moments",
+      "effect": "--",
+      "stat": {
+        "kind": "security",
+        "value": 2
+      },
+      "costs": {
+        "deploy": 5,
+        "reserve": 3
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "ship",
+      "source": {
+        "sheet": "Cards",
+        "row": 36
+      }
+    },
+    {
+      "id": "loc.armoured_frigate",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 2,
+      "name": "Armoured Frigate",
+      "type": "ship",
+      "faction_code": "NA",
+      "factions": [
+        "NA"
+      ],
+      "tags": [
+        "Neutral"
+      ],
+      "image": "ishimura",
+      "effect": "Security +2 while exhausted",
+      "stat": {
+        "kind": "security",
+        "value": 3
+      },
+      "costs": {
+        "deploy": 6,
+        "reserve": 4
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "ship",
+      "source": {
+        "sheet": "Cards",
+        "row": 37
+      }
+    },
+    {
+      "id": "loc.attack_vessel",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 4,
+      "name": "Attack Vessel",
+      "type": "ship",
+      "faction_code": "SP",
+      "factions": [
+        "SP"
+      ],
+      "tags": [
+        "Space Pirate"
+      ],
+      "image": "Space_Pirate_Vessel",
+      "effect": "Security +2 when raiding with this vehicle",
+      "stat": {
+        "kind": "security",
+        "value": 1
+      },
+      "costs": {
+        "deploy": 3,
+        "reserve": 1
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "ship",
+      "source": {
+        "sheet": "Cards",
+        "row": 38
+      }
+    },
+    {
+      "id": "loc.pirate_destroyer",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 2,
+      "name": "Pirate Destroyer",
+      "type": "ship",
+      "faction_code": "SP",
+      "factions": [
+        "SP"
+      ],
+      "tags": [
+        "Space Pirate"
+      ],
+      "image": "pirate_destroyer",
+      "effect": "When you successfully raid: Ready this ship",
+      "stat": {
+        "kind": "security",
+        "value": 3
+      },
+      "costs": {
+        "deploy": 6,
+        "reserve": 4
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "ship",
+      "source": {
+        "sheet": "Cards",
+        "row": 39
+      }
+    },
+    {
+      "id": "loc.frigate_orpheon",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 2,
+      "name": "Frigate Orpheon",
+      "type": "ship",
+      "faction_code": "SP",
+      "factions": [
+        "SP"
+      ],
+      "tags": [
+        "Space Pirate"
+      ],
+      "image": "frigate_orpheon",
+      "effect": "This ship does not exhaust when transporting",
+      "stat": {
+        "kind": "security",
+        "value": 4
+      },
+      "costs": {
+        "deploy": 7,
+        "reserve": 5
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "ship",
+      "source": {
+        "sheet": "Cards",
+        "row": 40
+      }
+    },
+    {
+      "id": "loc.the_baby",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 2,
+      "name": "The Baby",
+      "type": "character",
+      "faction_code": "NACZ",
+      "factions": [
+        "NA",
+        "CZ"
+      ],
+      "tags": [
+        "Chozo",
+        "Neutral"
+      ],
+      "image": "SR_samus_with_baby",
+      "effect": "@[ex]: Attach to another character. That character exhausts at the end of every turn.",
+      "stat": {
+        "kind": "strength",
+        "value": 0
+      },
+      "costs": {
+        "deploy": 5,
+        "reserve": 3
+      },
+      "flavor": "I completely eradicated them except for a larva, which after hatching followed me like a confused child...",
+      "dual": true,
+      "layout": "default",
+      "source": {
+        "sheet": "Cards",
+        "row": 41
+      }
+    }
+  ]
+}

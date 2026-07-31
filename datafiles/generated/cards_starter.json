@@ -1,0 +1,266 @@
+{
+  "schema_version": 1,
+  "generated_from": "boardgamefiles/chozoreference.xlsx",
+  "sheet": "Starter",
+  "pool": "starter",
+  "unique_count": 8,
+  "copy_count": 10,
+  "cards": [
+    {
+      "id": "starter.ship_captain",
+      "set": "LOC",
+      "pool": "starter",
+      "count": 1,
+      "name": "Ship Captain",
+      "type": "character",
+      "faction_code": "NA",
+      "factions": [
+        "NA"
+      ],
+      "tags": [
+        "Neutral"
+      ],
+      "image": "shipcaptain",
+      "effect": "--",
+      "stat": {
+        "kind": "strength",
+        "value": 2
+      },
+      "costs": {
+        "deploy": null,
+        "reserve": 3
+      },
+      "flavor": "A lust for power drives even civilians to the furthest lengths",
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Starter",
+        "row": 2
+      }
+    },
+    {
+      "id": "starter.sloop",
+      "set": "LOC",
+      "pool": "starter",
+      "count": 1,
+      "name": "Sloop",
+      "type": "ship",
+      "faction_code": "NA",
+      "factions": [
+        "NA"
+      ],
+      "tags": [
+        "Neutral"
+      ],
+      "image": "sloop",
+      "effect": "--",
+      "stat": {
+        "kind": "security",
+        "value": 1
+      },
+      "costs": {
+        "deploy": null,
+        "reserve": 2
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "ship",
+      "source": {
+        "sheet": "Starter",
+        "row": 3
+      }
+    },
+    {
+      "id": "starter.orders_received",
+      "set": "LOC",
+      "pool": "starter",
+      "count": 2,
+      "name": "Orders Received",
+      "type": "event",
+      "faction_code": "NA",
+      "factions": [
+        "NA"
+      ],
+      "tags": [
+        "Event"
+      ],
+      "image": "anyobjections",
+      "effect": "+1 CP",
+      "stat": {
+        "kind": null,
+        "value": null
+      },
+      "costs": {
+        "deploy": null,
+        "reserve": null
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Starter",
+        "row": 4
+      }
+    },
+    {
+      "id": "starter.researcher",
+      "set": "LOC",
+      "pool": "starter",
+      "count": 1,
+      "name": "Researcher",
+      "type": "character",
+      "faction_code": "NA",
+      "factions": [
+        "NA"
+      ],
+      "tags": [
+        "Neutral"
+      ],
+      "image": "scientist",
+      "effect": "Start of turn: Draw 1 card, then discard 1 card",
+      "stat": {
+        "kind": "strength",
+        "value": 0
+      },
+      "costs": {
+        "deploy": 2,
+        "reserve": 1
+      },
+      "flavor": "I personally delivered it to the Galactic Research Station at Ceres so scientists could study its energy producing qualities…",
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Starter",
+        "row": 5
+      }
+    },
+    {
+      "id": "starter.private_military",
+      "set": "LOC",
+      "pool": "starter",
+      "count": 2,
+      "name": "Private Military",
+      "type": "character",
+      "faction_code": "NA",
+      "factions": [
+        "NA"
+      ],
+      "tags": [
+        "Neutral"
+      ],
+      "image": "military",
+      "effect": "--",
+      "stat": {
+        "kind": "strength",
+        "value": 1
+      },
+      "costs": {
+        "deploy": null,
+        "reserve": 2
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Starter",
+        "row": 6
+      }
+    },
+    {
+      "id": "starter.budget_cuts",
+      "set": "LOC",
+      "pool": "starter",
+      "count": 1,
+      "name": "Budget Cuts",
+      "type": "event",
+      "faction_code": "NA",
+      "factions": [
+        "NA"
+      ],
+      "tags": [
+        "Event"
+      ],
+      "image": "stocks",
+      "effect": "The next time you reserve a card from the shop, pay 1 less CP",
+      "stat": {
+        "kind": null,
+        "value": null
+      },
+      "costs": {
+        "deploy": null,
+        "reserve": null
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Starter",
+        "row": 7
+      }
+    },
+    {
+      "id": "starter.away_team",
+      "set": "LOC",
+      "pool": "starter",
+      "count": 1,
+      "name": "Away Team",
+      "type": "event",
+      "faction_code": "NA",
+      "factions": [
+        "NA"
+      ],
+      "tags": [
+        "Event"
+      ],
+      "image": "awayteam",
+      "effect": "The next time you attempt to capture a metroid, pay 1 less CP",
+      "stat": {
+        "kind": null,
+        "value": null
+      },
+      "costs": {
+        "deploy": null,
+        "reserve": null
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Starter",
+        "row": 8
+      }
+    },
+    {
+      "id": "starter.military_rations",
+      "set": "LOC",
+      "pool": "starter",
+      "count": 1,
+      "name": "Military Rations",
+      "type": "event",
+      "faction_code": "NA",
+      "factions": [
+        "NA"
+      ],
+      "tags": [
+        "Event"
+      ],
+      "image": "rations",
+      "effect": "The next time one of your characters would be exhausted by a card effect before your next turn: It doesn't",
+      "stat": {
+        "kind": null,
+        "value": null
+      },
+      "costs": {
+        "deploy": null,
+        "reserve": null
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Starter",
+        "row": 9
+      }
+    }
+  ]
+}

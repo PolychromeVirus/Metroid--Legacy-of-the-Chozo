@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "generated_at_utc": "2026-07-26T02:39:37.671534+00:00",
+  "source": "boardgamefiles/chozoreference.xlsx",
+  "status": "passed",
+  "error_count": 0,
+  "warning_count": 1,
+  "outputs": [
+    {
+      "pool": "loc",
+      "sheet": "Cards",
+      "filename": "cards_loc.json",
+      "unique_count": 40,
+      "copy_count": 105
+    },
+    {
+      "pool": "lop",
+      "sheet": "Set2",
+      "filename": "cards_lop.json",
+      "unique_count": 9,
+      "copy_count": 22
+    },
+    {
+      "pool": "starter",
+      "sheet": "Starter",
+      "filename": "cards_starter.json",
+      "unique_count": 8,
+      "copy_count": 10
+    },
+    {
+      "pool": "metroids",
+      "sheet": "Metroids",
+      "filename": "metroids.json",
+      "unique_count": 6,
+      "copy_count": 60
+    }
+  ],
+  "issues": [
+    {
+      "severity": "warning",
+      "code": "recovered_header",
+      "sheet": "Starter",
+      "row": 1,
+      "field": "count",
+      "message": "Starter!A1 is blank; column A was interpreted as count."
+    }
+  ]
+}
