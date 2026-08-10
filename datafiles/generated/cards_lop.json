@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "generated_from": "boardgamefiles/chozoreference.xlsx",
+  "generated_from": "chozoreference.xlsx",
   "sheet": "Set2",
   "pool": "lop",
-  "unique_count": 9,
-  "copy_count": 22,
+  "unique_count": 10,
+  "copy_count": 24,
   "cards": [
     {
       "id": "lop.corrupt_rundas",
@@ -23,10 +23,10 @@
         "Bounty Hunter"
       ],
       "image": "prundas",
-      "effect": "Corrupt Rundas is deployed with 3 Phazon tokens",
+      "effect": "Corrupt Rundas is deployed with 3 Phazon tokens\n\nCorrupt Rundas' Strength is equal to the number of Phazon tokens it has",
       "stat": {
         "kind": "strength",
-        "value": 5
+        "value": "X"
       },
       "costs": {
         "deploy": 5,
@@ -89,7 +89,7 @@
         "Phazon"
       ],
       "image": "darksamus",
-      "effect": "@[cost,1]@[ex]: Remove all Phazon tokens from this card. Discard a character with strength less than or equal to the number removed",
+      "effect": "@[cost,1]@[ex]: Remove all Phazon tokens from this card. Discard any number of characters who's total strength sums to less than or equal to the number of tokens removed.\n\n@[ex]: Move a Phazon token from another card you control to this one\n\nDark Samus cannot be discarded by accumulating Phazon tokens.",
       "stat": {
         "kind": "strength",
         "value": 2
@@ -190,7 +190,7 @@
         "Thoha"
       ],
       "image": "chozo_ghosts",
-      "effect": null,
+      "effect": "At the end of each turn, move a Phazon token from another card you control to Chozo Ghosts. Then, if this card has 3 or more Phazon tokens, discard it and put its Phazon tokens on a character your opponent controls.",
       "stat": {
         "kind": "strength",
         "value": 1
@@ -289,7 +289,7 @@
         "Galactic Federation"
       ],
       "image": "ped",
-      "effect": "@[ex]: Attach to another character. Attached character has:\n\"@[cost,2]: Remove all phazon tokens from this card, +1 Strength for each token removed until end of turn\"",
+      "effect": "@[ex]: Attach to a character you control. Attached character has:\n\"@[cost,2]: Remove all phazon tokens from this card, +1 Strength for each token removed until end of turn\" and gains a phazon token at the end of every turn.",
       "stat": {
         "kind": "strength",
         "value": 0
@@ -304,6 +304,39 @@
       "source": {
         "sheet": "Set2",
         "row": 10
+      }
+    },
+    {
+      "id": "lop.hyper_mode",
+      "set": "LOP",
+      "pool": "lop",
+      "count": 2,
+      "name": "Hyper Mode",
+      "type": "event",
+      "faction_code": "PZ",
+      "factions": [
+        "PZ"
+      ],
+      "tags": [
+        "Phazon",
+        "Event"
+      ],
+      "image": "mp3_hypermode",
+      "effect": "Remove a phazon token from all cards you control. For every token removed, put a phazon token on one character you control.",
+      "stat": {
+        "kind": null,
+        "value": null
+      },
+      "costs": {
+        "deploy": null,
+        "reserve": 4
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Set2",
+        "row": 11
       }
     }
   ]

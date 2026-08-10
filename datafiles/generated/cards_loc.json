@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "generated_from": "boardgamefiles/chozoreference.xlsx",
+  "generated_from": "chozoreference.xlsx",
   "sheet": "Cards",
   "pool": "loc",
-  "unique_count": 40,
-  "copy_count": 105,
+  "unique_count": 47,
+  "copy_count": 124,
   "cards": [
     {
       "id": "loc.gandrayda",
@@ -30,7 +30,7 @@
         "deploy": 5,
         "reserve": 3
       },
-      "flavor": "\"You know, you should never trust strangers, Sammy.\"",
+      "flavor": "You know, you should never trust strangers, Sammy.",
       "dual": false,
       "layout": "default",
       "source": {
@@ -62,7 +62,7 @@
         "deploy": 5,
         "reserve": 3
       },
-      "flavor": "\"Hey, relax! We're the good guys! Justice will prevail and all that stuff... right, Samus?\"",
+      "flavor": "Hey, relax! We're the good guys! Justice will prevail and all that stuff... right, Samus?",
       "dual": false,
       "layout": "default",
       "source": {
@@ -94,7 +94,7 @@
         "deploy": 5,
         "reserve": 3
       },
-      "flavor": "\"Don't you feel the power? Soon everything will be corrupted. Including you!\"",
+      "flavor": "Don't you feel the power? Soon everything will be corrupted. Including you!",
       "dual": false,
       "layout": "default",
       "source": {
@@ -194,7 +194,7 @@
         "deploy": 5,
         "reserve": 3
       },
-      "flavor": "\"There is no need for us to fight.\"",
+      "flavor": "There is no need for us to fight.",
       "dual": false,
       "layout": "default",
       "source": {
@@ -260,7 +260,7 @@
         "deploy": 6,
         "reserve": 4
       },
-      "flavor": "\"Foolish daughter... Leave the galaxy to me. Close your eyes and rest.\"",
+      "flavor": "Foolish daughter... Leave the galaxy to me. Close your eyes and rest.",
       "dual": false,
       "layout": "default",
       "source": {
@@ -388,7 +388,7 @@
         "deploy": 5,
         "reserve": 3
       },
-      "flavor": "\"Outstanding work, Samus. I don't say this often, but I sure am impressed.\"",
+      "flavor": "Outstanding work, Samus. I don't say this often, but I sure am impressed.",
       "dual": false,
       "layout": "default",
       "source": {
@@ -420,7 +420,7 @@
         "deploy": 5,
         "reserve": 3
       },
-      "flavor": "\"Any objections, Lady?\"",
+      "flavor": "Any objections, Lady?",
       "dual": false,
       "layout": "default",
       "source": {
@@ -580,7 +580,7 @@
         "deploy": 6,
         "reserve": 4
       },
-      "flavor": "\"Beyond my existence, there is no value in having the existence of the Chozo. We are only discarding what is useless.\"",
+      "flavor": "Beyond my existence, there is no value in having the existence of the Chozo. We are only discarding what is useless.",
       "dual": false,
       "layout": "default",
       "source": {
@@ -764,7 +764,7 @@
         "Chozo"
       ],
       "image": "zebes",
-      "effect": "\"Chozo\" aligned cards may be deployed and reserved for 1 less CP",
+      "effect": "Chozo aligned cards may be deployed and reserved for 1 less CP",
       "stat": {
         "kind": null,
         "value": null
@@ -1297,6 +1297,230 @@
       "source": {
         "sheet": "Cards",
         "row": 41
+      }
+    },
+    {
+      "id": "loc.ship_captain",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 2,
+      "name": "Ship Captain",
+      "type": "character",
+      "faction_code": "NA",
+      "factions": [
+        "NA"
+      ],
+      "tags": [
+        "Neutral"
+      ],
+      "image": "shipcaptain",
+      "effect": "--",
+      "stat": {
+        "kind": "strength",
+        "value": 2
+      },
+      "costs": {
+        "deploy": null,
+        "reserve": 3
+      },
+      "flavor": "A lust for power drives even civilians to the furthest lengths",
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Cards",
+        "row": 42
+      }
+    },
+    {
+      "id": "loc.sloop",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 3,
+      "name": "Sloop",
+      "type": "ship",
+      "faction_code": "NA",
+      "factions": [
+        "NA"
+      ],
+      "tags": [
+        "Neutral"
+      ],
+      "image": "sloop",
+      "effect": "--",
+      "stat": {
+        "kind": "security",
+        "value": 1
+      },
+      "costs": {
+        "deploy": null,
+        "reserve": 2
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "ship",
+      "source": {
+        "sheet": "Cards",
+        "row": 43
+      }
+    },
+    {
+      "id": "loc.orders_received",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 4,
+      "name": "Orders Received",
+      "type": "event",
+      "faction_code": "NA",
+      "factions": [
+        "NA"
+      ],
+      "tags": [
+        "Event"
+      ],
+      "image": "anyobjections",
+      "effect": "+1 CP",
+      "stat": {
+        "kind": null,
+        "value": null
+      },
+      "costs": {
+        "deploy": null,
+        "reserve": 2
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Cards",
+        "row": 44
+      }
+    },
+    {
+      "id": "loc.private_military",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 4,
+      "name": "Private Military",
+      "type": "character",
+      "faction_code": "NA",
+      "factions": [
+        "NA"
+      ],
+      "tags": [
+        "Neutral"
+      ],
+      "image": "military",
+      "effect": "--",
+      "stat": {
+        "kind": "strength",
+        "value": 1
+      },
+      "costs": {
+        "deploy": null,
+        "reserve": 2
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Cards",
+        "row": 45
+      }
+    },
+    {
+      "id": "loc.budget_cuts",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 2,
+      "name": "Budget Cuts",
+      "type": "event",
+      "faction_code": "NA",
+      "factions": [
+        "NA"
+      ],
+      "tags": [
+        "Event"
+      ],
+      "image": "stocks",
+      "effect": "The next time you reserve a card from the shop, pay 1 less CP",
+      "stat": {
+        "kind": null,
+        "value": null
+      },
+      "costs": {
+        "deploy": null,
+        "reserve": 2
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Cards",
+        "row": 46
+      }
+    },
+    {
+      "id": "loc.away_team",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 2,
+      "name": "Away Team",
+      "type": "event",
+      "faction_code": "NA",
+      "factions": [
+        "NA"
+      ],
+      "tags": [
+        "Event"
+      ],
+      "image": "awayteam",
+      "effect": "The next time you attempt to capture a metroid, pay 1 less CP",
+      "stat": {
+        "kind": null,
+        "value": null
+      },
+      "costs": {
+        "deploy": null,
+        "reserve": 2
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Cards",
+        "row": 47
+      }
+    },
+    {
+      "id": "loc.military_rations",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 2,
+      "name": "Military Rations",
+      "type": "event",
+      "faction_code": "NA",
+      "factions": [
+        "NA"
+      ],
+      "tags": [
+        "Event"
+      ],
+      "image": "rations",
+      "effect": "The next time one of your characters would be exhausted by a card effect before your next turn: It doesn't",
+      "stat": {
+        "kind": null,
+        "value": null
+      },
+      "costs": {
+        "deploy": null,
+        "reserve": 2
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Cards",
+        "row": 48
       }
     }
   ]

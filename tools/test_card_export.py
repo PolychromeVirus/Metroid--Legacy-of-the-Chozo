@@ -12,7 +12,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 EXPORTER = REPO_ROOT / "tools" / "export_card_data.py"
-WORKBOOK = REPO_ROOT / "boardgamefiles" / "chozoreference.xlsx"
+WORKBOOK = REPO_ROOT / "chozoreference.xlsx"
 
 
 class CardExportTests(unittest.TestCase):
@@ -48,8 +48,8 @@ class CardExportTests(unittest.TestCase):
 
     def test_expected_pool_totals(self) -> None:
         expected = {
-            "cards_loc.json": (40, 105),
-            "cards_lop.json": (9, 22),
+            "cards_loc.json": (47, 124),
+            "cards_lop.json": (10, 24),
             "cards_starter.json": (8, 10),
             "metroids.json": (6, 60),
         }

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_from": "boardgamefiles/chozoreference.xlsx",
+  "generated_from": "chozoreference.xlsx",
   "sheet": "Starter",
   "pool": "starter",
   "unique_count": 8,
@@ -92,7 +92,7 @@
       },
       "costs": {
         "deploy": null,
-        "reserve": null
+        "reserve": 2
       },
       "flavor": null,
       "dual": false,
@@ -188,7 +188,7 @@
       },
       "costs": {
         "deploy": null,
-        "reserve": null
+        "reserve": 2
       },
       "flavor": null,
       "dual": false,
@@ -220,7 +220,7 @@
       },
       "costs": {
         "deploy": null,
-        "reserve": null
+        "reserve": 2
       },
       "flavor": null,
       "dual": false,
@@ -252,7 +252,7 @@
       },
       "costs": {
         "deploy": null,
-        "reserve": null
+        "reserve": 2
       },
       "flavor": null,
       "dual": false,

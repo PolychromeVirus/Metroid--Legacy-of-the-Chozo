@@ -1,6 +1,6 @@
 # Card data export
 
-`boardgamefiles/chozoreference.xlsx` is the canonical source for playable card data. Run:
+`chozoreference.xlsx` in the repository root is the canonical source for playable card data. Run:
 
 ```powershell
 python tools/export_card_data.py

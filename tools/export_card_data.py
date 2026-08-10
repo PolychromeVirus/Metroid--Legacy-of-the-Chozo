@@ -282,11 +282,15 @@ def validate_effect_markup(
 
 def build_asset_stems(asset_root: Path) -> set[str]:
     extensions = {".png", ".jpg", ".jpeg", ".webp", ".avif", ".svg"}
-    return {
-        path.stem.casefold()
-        for path in asset_root.rglob("*")
-        if path.is_file() and path.suffix.casefold() in extensions
-    }
+    stems: set[str] = set()
+    for path in asset_root.rglob("*"):
+        if not path.is_file() or path.suffix.casefold() not in extensions:
+            continue
+        stem = path.stem.casefold()
+        stems.add(stem)
+        if stem.startswith("card_"):
+            stems.add(stem.removeprefix("card_"))
+    return stems
 
 
 def build_headers(
@@ -439,7 +443,7 @@ def export_card_sheet(
                 sheet.title,
                 row_number,
                 "image",
-                f"No source image with stem {image!r} was found under boardgamefiles.",
+                f"No card image with stem {image!r} was found under datafiles/cards.",
             )
 
         effect = nullable_text(cell_value(row, headers, "effect"))
@@ -705,7 +709,7 @@ def main() -> int:
     parser.add_argument(
         "--workbook",
         type=Path,
-        default=repo_root / "boardgamefiles" / "chozoreference.xlsx",
+        default=repo_root / "chozoreference.xlsx",
         help="Path to the canonical .xlsx workbook.",
     )
     parser.add_argument(
@@ -729,7 +733,7 @@ def main() -> int:
 
     workbook = load_workbook(workbook_path, data_only=False, read_only=True)
     validator = Validator()
-    asset_stems = build_asset_stems(repo_root / "boardgamefiles")
+    asset_stems = build_asset_stems(repo_root / "datafiles" / "cards")
     exported: list[tuple[str, dict[str, Any]]] = []
     summaries: list[dict[str, Any]] = []
 

@@ -1,7 +1,7 @@
 # Card Data Validation
 
 - Status: **PASSED**
-- Source: `boardgamefiles/chozoreference.xlsx`
+- Source: `chozoreference.xlsx`
 - Errors: 0
 - Warnings: 1
 
@@ -9,8 +9,8 @@
 
 | Pool | Worksheet | Unique definitions | Copies | File |
 |---|---|---:|---:|---|
-| loc | Cards | 40 | 105 | `cards_loc.json` |
-| lop | Set2 | 9 | 22 | `cards_lop.json` |
+| loc | Cards | 47 | 124 | `cards_loc.json` |
+| lop | Set2 | 10 | 24 | `cards_lop.json` |
 | starter | Starter | 8 | 10 | `cards_starter.json` |
 | metroids | Metroids | 6 | 60 | `metroids.json` |
 

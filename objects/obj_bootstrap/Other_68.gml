@@ -19,7 +19,8 @@ switch (_event_type) {
                     {
                         type: "join_hello",
                         protocol: 1,
-                        player_name: net_player_name
+                        player_name: net_player_name,
+                        leader_id: net_leader_id
                     }
                 );
                 show_debug_message("[NET] Connected to host.");
@@ -49,6 +50,11 @@ switch (_event_type) {
                         }
                         global.loc_network_host_name = net_player_name;
                         global.loc_network_guest_name = _guest_name;
+                        global.loc_network_host_leader = net_leader_id;
+                        global.loc_network_guest_leader =
+                            variable_struct_exists(_packet, "leader_id")
+                                ? _packet.leader_id
+                                : "bsl_researcher";
                         net_status = _guest_name
                             + " connected. Starting match...";
                         show_debug_message(
@@ -63,7 +69,9 @@ switch (_event_type) {
                                 protocol: 1,
                                 seed: _match_seed,
                                 host_name: net_player_name,
-                                guest_name: _guest_name
+                                guest_name: _guest_name,
+                                host_leader: global.loc_network_host_leader,
+                                guest_leader: global.loc_network_guest_leader
                             }
                         );
                         network_prepare_match_restart(
@@ -87,6 +95,8 @@ switch (_event_type) {
                         );
                         global.loc_network_host_name = _packet.host_name;
                         global.loc_network_guest_name = _packet.guest_name;
+                        global.loc_network_host_leader = _packet.host_leader;
+                        global.loc_network_guest_leader = _packet.guest_leader;
                         network_prepare_match_restart(
                             "client",
                             net_socket,
@@ -123,6 +133,17 @@ switch (_event_type) {
                         show_debug_message(
                             "[NET] Applied command "
                             + string(_packet.sequence) + "."
+                        );
+                    }
+                    break;
+
+                case "chat_message":
+                    if (!network_lobby_active
+                    && game_state.game_mode == "network"
+                    && variable_struct_exists(_packet, "message")) {
+                        append_chat_message(
+                            1 - network_local_player,
+                            _packet.message
                         );
                     }
                     break;

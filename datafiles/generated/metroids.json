@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_from": "boardgamefiles/chozoreference.xlsx",
+  "generated_from": "chozoreference.xlsx",
   "sheet": "Metroids",
   "pool": "metroids",
   "unique_count": 6,

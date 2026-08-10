@@ -45,6 +45,11 @@ Each player totals the Research Value of the Metroids in their Lab and rounds th
 | Neutral | NA | Science and research |
 | Phazon | PZ | Corruption through card interaction and accumulating Phazon tokens |
 
+Phazon-infected Bounty Hunter variants reuse their original character artwork,
+but their card sprite asset names add a leading `p`: Corrupt Rundas uses
+`CARD_prundas.png` and Corrupt Gandrayda uses `CARD_pgandrayda.png`, rather than
+the uninfected `CARD_rundas.png` and `CARD_gandrayda.png` assets.
+
 Cards may have multiple factions, such as `BHCZ`, `NACZ`, or `GFPZ`. The rules explicitly say the selected starter faction does not restrict cards a player may acquire.
 
 This is a shared-market deck-builder in the style of Star Realms, not a constructed-deck trading card game. There are no deck-size, faction, or copy-count restrictions during play.
@@ -152,6 +157,7 @@ The active player may take actions in any order and may repeat them while able t
 | Play an Event | Once per turn; play it from hand for no CP cost |
 | Capture | Pay 1 CP and exhaust a Ship; move an eligible Metroid from SR388 onto it |
 | Raid | Pay 2 CP and resolve a Ship-versus-Ship raid |
+| Salvage | Discard any number of your ready Characters, Ships, or Locations one at a time; gain CP equal to half that card's printed Reserve cost, rounded down |
 | Refresh hand | Pay 1 CP; discard any number of cards, then draw until holding five |
 | Refresh Shop | Pay 1 CP; discard all five Shop cards and refill the row |
 | Activate a card | Pay and resolve the costs printed on the card |
@@ -169,6 +175,7 @@ Whenever a Shop card is bought by Deploying or Reserving it, immediately refill 
 - A player may activate abilities while they have priority.
 - The active player normally has priority during their own turn.
 - Structured procedures can grant priority at other times; for example, attacker and defender each receive an opportunity to use effects during a raid.
+- Card text that triggers at the end of every turn triggers at the end of each of that card controller's turns, not at the end of both players' turns.
 - The design intentionally avoids general reactions and interrupts. None are currently known in the card pool.
 - Passive abilities function while their source is exhausted unless the ability is conditional or another effect explicitly disables it.
 - Simultaneous effects cannot be controlled by different players because priority determines whose effects are resolving. When one controller has simultaneous effects, that controller chooses their order.
@@ -245,6 +252,8 @@ If no Ship contributes Security to the check, every Omega in the Lab breaches si
 
 A Ship without cargo is a legal raid target, although raiding it normally provides no benefit. Discard choices are made by the owner of the cards unless an effect explicitly says otherwise.
 
+During either side's Raid priority window, hovering one of the priority player's permanents exposes its normal card-anchored context menu without requiring selection. A ready Character has an `EXHAUST: +X SECURITY` contribution button alongside any otherwise-legal activated abilities and Salvage. Abilities use their normal targets and follow-up choices; after an action finishes, play returns to the same attacker or defender Raid window. Only Lock Attackers / Resolve Raid remains in the sidebar.
+
 ## 11. SR388 and Metroid evolution
 
 SR388 normally has four numbered surface slots. Empty slots are filled with Larvae at end of turn.
@@ -253,7 +262,17 @@ Evolution order:
 
 `Larva -> Alpha -> Gamma -> Zeta -> Omega`
 
-The Mutation Track has eight spaces. Whenever a Zeta or Omega is born for any reason, advance the Mutation Track one space. In the normal evolution chain, this occurs when a Gamma becomes a Zeta or a Zeta becomes an Omega.
+The Mutation Track has eight spaces. Whenever a Zeta is born, advance the
+Mutation Track one space. Whenever an Omega is born while Mutation is 0-3,
+advance it one space; if Mutation is already 4 or higher, advance it two
+spaces instead. In the normal evolution chain, these occur when a Gamma
+becomes a Zeta or a Zeta becomes an Omega. Mutation cannot advance beyond 8.
+
+Two alternate conditions start a final round rather than ending immediately:
+either player reaching 10 Metroids in their Lab, or the match reaching turn 50.
+The active player finishes the current turn, the opponent receives one final
+turn, and Research is then scored. Mutation reaching 8 remains an immediate
+ending, including during those final turns.
 
 When a Metroid evolves, return the old stage to its supply and replace it with the next stage. For the rules engine, each stage supply is infinite; physical supply limits may be added later.
 
@@ -290,7 +309,7 @@ Broad, non-selecting effects do not create this interaction merely because they 
 
 ### Corruption threshold
 
-There is no upper limit on Phazon tokens. Whenever a card exhausts, if it has at least three Phazon tokens, discard it. If it exhausted to pay an ability cost, the card is discarded first but its paid ability still resolves. Some effects can use totals above three.
+There is no upper limit on Phazon tokens. Whenever a card exhausts, if it has at least three Phazon tokens, discard it. If it exhausted to pay an ability cost, the card is discarded first but its paid ability still resolves. Some effects can use totals above three. Dark Samus is explicitly immune to this accumulation discard and may exhaust to move one Phazon token from another permanent she controls onto herself.
 
 Phazon tokens exist only while their card remains on the board. Remove all of its Phazon tokens whenever it is discarded, returned to hand, or destroyed.
 
@@ -317,9 +336,11 @@ Hunter Metroids:
 Queen Metroid Awakens behaves as a game-state event rather than a normal purchase:
 
 1. Queen occupies the Shop slot into which it was drawn.
-2. Its global effect resolves immediately.
-3. Queen is shuffled back into the Shop deck without being bought or discarded.
-4. Its Shop slot is immediately refilled.
+2. Finish filling every other open Shop slot before Queen activates.
+3. Its global effect then resolves immediately.
+4. As part of the same resolution, Queen is shuffled back into the Shop deck
+   without requiring a second confirmation and without being bought or discarded.
+5. Its Shop slot is immediately refilled.
 
 ## 14. Current content inventory
 
@@ -387,6 +408,11 @@ The initial rules review has no unresolved core cases. The full current card
 pool has a first-pass implementation. Test games may still expose wording,
 timing, or unusual state combinations that need clarification.
 
+Hyper Mode removes one Phazon token from every card the player controls,
+including attached cards, then places the complete removed total onto one chosen
+Character that player controls. If no tokens are removed, no choice is created;
+if no Character exists, the tokens remain removed with no recipient.
+
 Identity-tinted starter substitutions are implemented as an optional setup rule
 for human-vs-AI, AI-vs-AI, and batch profiles. These are focused substitutions
 inside the shared Neutral starter rather than complete faction-specific starter
@@ -414,7 +440,7 @@ special Omega containment advancing after its breach casualty. The suite also
 checks all seven concrete identity-starter substitutions (both Chozo branches),
 ten-card deck preservation, duplicate-card replacement counts, and the disabled
 starter path. Additional
-checks cover corrupted exhaustion costs, Queen recycling at Shop exhaustion,
+checks cover corrupted exhaustion costs and Queen waiting for the full Shop row,
 declining Adam during special containment, sequential Omega breaches, Hunter
 breach priority, and hosts carrying multiple attachments. Raid checks cover
 tied Ship destruction, automatic single-cargo transfer, full-winner overflow,
@@ -424,7 +450,7 @@ contributors, defensive abilities modifying unlocked totals, Pirate Destroyer
 readying after a win, and Queen and SA-X special containment completing across
 both players.
 
-### Working implementation checkpoint — July 31, 2026
+### Working implementation checkpoint — August 10, 2026
 
 The prototype is currently playable in hotseat, human-versus-AI, and direct-IP
 host/guest modes. The implemented rules include the complete current card pool,
@@ -434,9 +460,86 @@ game-state events, scoring, turn handoffs, and game-end presentation.
 
 Current interface decisions:
 
+- Title-screen settings persist in `loc_settings.ini`. They currently cover the
+  default close/far camera framing, default free/locked camera behavior, separate
+  Player 1 and Player 2 hard-light UI accents, the most recently entered player
+  name, and whether developer/test controls are visible. These custom accents
+  replace generic interface palettes only; faction identity palettes remain
+  independent. Sidebar and menu surfaces derive a restrained dark tint from the
+  selected accent, calibrated so cyan retains its original blue-gray appearance
+  while every other choice receives the same color relationship. Debug-off hides
+  the in-match Test Tools/SIM controls and
+  title-screen batch/regression entries.
+
 - Hotseat changes the full palette to identify the active player.
+- The Shop tray reserves a taller header band above its fixed card grid so the
+  `SHOP` label remains visually separate from the first row at every camera scale.
+- The in-match Pause menu includes an Options screen matching the title-menu
+  settings. UI palettes, contextual help, debug visibility, and camera defaults
+  can be edited and persisted without leaving the match; camera changes also
+  apply immediately to the current board view.
+- A Help / Rules reference is available from both the title and Pause menus. It
+  uses a two-column layout with selectable concept sections on the left and a
+  scrollable plain-language summary on the right. Initial topics cover the game
+  overview, turn structure, cards and zones, CP/actions, Capture, Containment,
+  Raids, Metroids, Research, and Factions. Longer secondary concepts remain in
+  the summaries rather than shrinking the navigation labels.
+  Summary copy uses native-scale `FNT_METROID` typography matching its section
+  header, with wrapping and scrolling handling narrower layouts.
+  Selected Help topics and main-menu sections invert their accent fill and text
+  colors instead of adding a width-changing text marker.
+- Optional first-game guidance is persisted separately from contextual hover
+  help. One short modal lesson is queued at a time and waits for card/camera
+  presentation to finish before appearing. The first lesson explains locked and
+  unlocked camera controls; later triggers cover the first Action phase, hand
+  and Shop inspection, activated abilities, Capture, ending a
+  turn, Containment, Breaches, attacking and defending Raids, a Metroid entering
+  the Lab, Larva-to-Alpha evolution, the first Mutation advance, final-round
+  timing, Attachments, Phazon, Salvage, and hand/Shop refreshes. Lessons use
+  `GOT IT` and `DISABLE GUIDANCE`; acknowledged lesson IDs persist in
+  `loc_settings.ini` so they do not repeat in later matches. Both Options pages
+  include `RESTORE FIRST-TIME HINTS`, which clears that history and re-enables
+  guidance.
+- Corrupt Rundas uses its current Phazon token count as its dynamic Strength.
+  Chozo Ghosts now resolves as a mandatory sequence at the end of its controller's
+  own turn: its controller
+  moves one Phazon token from another controlled permanent, then discards the
+  Ghosts at three or more tokens and assigns all of those tokens to an opposing
+  Character. Multiple copies queue independently before Mutation begins.
+- The Recent Events rail is a scrollable chronological message feed: older entries
+  appear above newer entries and the live edge is anchored at the bottom. Setup and
+  loader errors remain pinned above the history in red with their full diagnostic
+  text.
+- Rules logging records named state changes at their resolution site, including
+  individual discards, attachments leaving with hosts, Phazon gains and resulting
+  token levels, corruption-triggered discards, Event outcomes, Raid initiation,
+  Capture, containment, and other scripted effects. Aggregate effects retain a
+  summary entry after their individual card entries.
+- A full-width text-chat field sits at the bottom of the event rail. Enter sends
+  `<player name>: <message>` in local, hotseat, AI, and direct-IP games; only the
+  player-name prefix is colored with that player's primary deck/faction color.
+  Direct-IP chat travels independently of gameplay priority and command sequencing.
+  Chat entries are structured records, so rules telemetry ignores their contents
+  when counting gameplay events. Faint horizontal rules separate feed entries;
+  system events use a desaturated straw-gray treatment while player chat bodies
+  remain bright for quick visual distinction.
+- Optional contextual help is enabled by default and persisted in settings.
+  Hovering core action controls shows a compact upper-left explanation with a
+  short, interaction-specific reason when unavailable, such as `(not enough
+  CP)` or `(no valid targets)`. Activated card effects use their structured
+  ability data for plain-language help. Target-specific failures stay on the
+  affected target; during Capture selection, an under-secured Metroid reports
+  `(not enough Security)` rather than placing that reason on the Capture button.
+- Mandatory pending-choice prompts now use a stronger top-center `TRANSMISSION
+  RECEIVED // ACTION REQUIRED` panel. They are spatially independent from
+  contextual hover help, so both may remain visible at once.
+  The normal Containment phase also presents an explicit mandatory prompt to
+  select a ready Ship to contribute its Security or choose `NO SHIP`.
 - AI and network modes keep the local player's palette and board view fixed.
-- A network player's board dims while the remote player takes their turn.
+- Network input authority follows `priority_player`, including effects that hand
+  a decision to the opponent; source ownership metadata never overrides the
+  responder. During ordinary remote priority, the action rail displays a disabled
+  `OPPONENT'S TURN` panel instead of dimming any portion of the playfield.
 - Targeted abilities resolve immediately; the game has no general reaction
   or targeted-effect response window.
 - Raid attacker/defender priority remains because contribution and raid
@@ -720,9 +823,9 @@ The title menu includes a fast AI-versus-AI batch configuration screen.
 - The title screen has a persistent, default-on `FACTION STARTERS` option for
   visible AI modes. When enabled, each AI makes one identity-specific
   replacement in its ten-card neutral starter deck; Shop counts are unchanged:
-  `NONE` replaces Military Rations with Armoured Frigate, `GF` replaces one
-  Private Military with GF Marine, `SP` replaces Sloop with Attack Vessel,
-  `CZ` replaces Ship Captain with a 50/50 Quiet Robe or Raven Beak, `BH`
+  `NONE` replaces Military Rations with Armoured Frigate. `GF` and `SP` use
+  provisional full faction decks described below. `CZ` replaces Ship Captain
+  with a 50/50 Quiet Robe or Raven Beak, `BH`
   replaces Budget Cuts with Ghor, and `PZ` replaces one Orders Received with
   Hive Mind Communication. A Chozo identity is renamed **Thoha** when it rolls
   Quiet Robe and **Mawkin** when it rolls Raven Beak.
@@ -779,6 +882,9 @@ The title menu includes a fast AI-versus-AI batch configuration screen.
   seat assignment, starting deck, winning deck, first player, profiles,
   winner, turns, Research, CP, favored-card counts, total owned cards,
   captures, raids, breaches, evolutions, hand refreshes, and Shop refreshes.
+  Per-player telemetry additionally records peak CP, captures, raids initiated
+  and won, breaches suffered, final Metroid and Research totals by stage, and
+  the most frequently acquired Shop card.
 - Completion produces a text report summarizing wins from Player Slot 1,
   wins from Player Slot 2, two-leg sweeps ("both" seats), split pairs, draws,
   average turns, average Research, and average favored-card acquisition by
@@ -792,9 +898,80 @@ the total games processed and scheduled games per seat matchup. Cells
 containing any invalid games use a red background to identify contaminated
 configurations.
 
+Batch matches have independent 500-turn and AI-decision safety limits. The turn
+limit prevents a strategically nonterminal game from accumulating enough board
+state and history that reaching the much larger decision limit itself becomes
+computationally expensive. Failsafe outcomes remain invalid/red rather than
+being counted as normal game results.
+
+Researcher requires one discard for each card it successfully draws. If the
+deck and discard pile cannot supply every requested draw, only the cards actually
+drawn must be discarded; drawing none creates no pending choice.
+
+The completed batch report is paginated. Its first page is the seat-oriented
+win-rate matrix. Four profile pages follow (neutral, GF, SP, and CZ), each aggregating point rate,
+per-game behavior, head-to-head results, Research contribution by Metroid
+stage, and the profile's most frequently acquired Shop card.
+
+Only GF, SP, and CZ have focused acquisition profiles. A focused AI receives a
+very small bonus for its own faction and a slight penalty for each of the other
+two main factions on a card. BH, PZ, and NA remain neutral secondary-color
+options rather than having dedicated priority brains.
+
+Raid planning distinguishes ordinary winning raids from tactical exhaustion
+raids. When an opponent has Metroids in its Lab, the AI may sacrifice an empty,
+ready Ship without committing Characters if the defender must exhaust useful
+Characters to win and doing so materially weakens its upcoming containment
+check. The score accounts for forced Strength, resulting containment deficit,
+Lab Research, raid cost, attacker value, cargo risk, and final-round pressure.
+
+Metroid movement uses explicit presentation transits in local and network play.
+Captures travel from SR388 or the Cavern to the destination Ship, and turn-start
+intake travels from Ship cargo into the opening Lab drawer. Gameplay waits for
+these sequences locally while both peers retain immediately synchronized rules
+state. Ships render all carried Metroids in overlapping slots populated from
+right to left rather than displaying only the first cargo card.
+
+Visible matches select named leaders rather than abstract factions. Adam
+Malkovich uses the GF deck and AI profile; Mother Brain uses SP; Quiet Robe and
+Raven Beak use the Thoha and Mawkin CZ decks respectively; and B.S.L. Researcher
+uses the neutral Mercenary configuration. Player 1 and Player 2/opponent leader
+selectors appear on the title screen. Both default to Random; Random resolves to
+one of the five concrete leaders at match start, and that resolved identity
+persists into rematches. Batch testing continues to use faction profiles
+directly.
+
+The title screen uses a persistent game-mode column and a contextual setup
+column. VS AI collects the human player's name and both deck choices; Hotseat
+collects two names and two decks; Network Play collects the local name and deck,
+then exposes Host and address/Join controls; AI vs AI collects two decks; and
+Settings exposes camera, debug, and UI-color controls. The three local modes use
+an explicit Play button. UI colors include an Auto choice that follows the
+resolved leader deck's faction color during play and uses the standard cyan
+accent on the title menu. Network peers exchange both names and
+resolved leader identities before constructing their synchronized decks.
+
+The provisional GF faction starter replaces the full neutral deck with two GF
+Soldiers; one each of GF Marine, G.F.S. Tyr, Adam Malkovich, Biologic Space
+Laboratories, Researcher, and Sloop; and two Private Military. Galactic
+Federation HQ, Admiral Dane, and G.F.S. Olympus remain Shop progression pieces.
+
+The provisional SP faction starter contains one Zebesian Pirate; one Attack
+Vessel; one each of Sloop, Beam Pirate, Space Pirate Homeworld, Researcher, Ship
+Captain, and Orders Received; and two Private Military. Mother Brain, Pirate
+Destroyer, Frigate Orpheon, and SA-X Breaks Out remain Shop progression pieces.
+
+The provisional CZ starter has separate Thoha and Mawkin configurations. Both
+contain Samus Aran, Gunship, Researcher, Ship Captain, two Private Military,
+Orders Received, and Away Team. Thoha adds Quiet Robe and Chozo Transport;
+Mawkin adds Chozo Warrior and Mawkin Starship. Raven Beak remains a Shop
+progression card while still serving as the persisted Mawkin identity marker.
+
 The game-end dialog shows turn/seed information and compact
 capture/raid/breach/evolution totals. Each player panel uses its identity palette,
 uniform uppercase `FNT_NUMBER` names, and boxed Research, CP, and Metroid symbols.
+Result, Player 1, and Player 2 tabs expose the same per-player telemetry for a
+single completed match without requiring a batch run.
 Their white NES-style values use visual glyph-bound centering and a dark outline
 for contrast. The boxed symbols are recolored through their alpha masks so the
 original cyan artwork cannot distort red, yellow, green, or Phazon palettes.
@@ -867,6 +1044,38 @@ instances and presentation assets. Its primary concepts are:
 - `ShipState`: cargo, base capacity of one, and capacity modifiers
 - `Effect`: costs, targets, conditions, resolution steps, and timing
 - `PendingChoice`: explicit player decision required to continue resolution
+
+### Runtime module layout
+
+`obj_bootstrap` is now an orchestration object rather than the source location
+for the entire program. Its Create event retains the shared faction-color macros
+and invokes ordered initializer modules; Step and Draw delegate to controller
+scripts. The extracted GameMaker script resources are:
+
+- `scr_loc_bootstrap_data`: generated-data loading, definitions, instances,
+  Shop/deck primitives, and dynamic sprites
+- `scr_loc_bootstrap_state`: presentation queues and initial game state
+- `scr_loc_rules`: factions, stats, containment, mutation, scoring, Queen, and
+  game-end resolution
+- `scr_loc_actions`: deployment, reserve, Events, refresh, capture, and Quiet Robe
+- `scr_loc_abilities`: activated-ability definitions, costs, targeting, and
+  resolution
+- `scr_loc_raids`: raid selection, contribution, abilities, cargo, and resolution
+- `scr_loc_modes_testing`: game modes, identity starters, rematches, debug
+  simulation, win previews, and animation scenarios
+- `scr_loc_batch`: batch schedules, paired seeds, reports, and match completion
+- `scr_loc_network`: direct-IP setup, synchronized inputs, and restart support
+- `scr_loc_ai`: acquisition heuristics, abilities, raids, pending choices, and
+  controller stepping
+- `scr_loc_regression`: deterministic rules regression cases
+- `scr_loc_developer_ui`: test helpers, remaining UI-state initialization, and AI
+  diagnostics
+- `scr_loc_step`: frame/input/presentation controller
+- `scr_loc_draw`: board and HUD renderer
+
+The module initializer order deliberately matches the former Create-event order,
+so existing instance-scoped functions and state retain their behavior while the
+large object event is reduced to explicit subsystem calls.
 - `GameEvent`: an auditable state-change record such as `CP_GAINED`, `CARD_EXHAUSTED`, `METROID_EVOLVED`, or `BREACH_OCCURRED`
 
 Random results, including first player, evolution rolls, and shuffles, use the

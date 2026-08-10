@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-07-26T02:39:37.671534+00:00",
-  "source": "boardgamefiles/chozoreference.xlsx",
+  "generated_at_utc": "2026-08-10T14:51:25.582043+00:00",
+  "source": "chozoreference.xlsx",
   "status": "passed",
   "error_count": 0,
   "warning_count": 1,
@@ -10,15 +10,15 @@
       "pool": "loc",
       "sheet": "Cards",
       "filename": "cards_loc.json",
-      "unique_count": 40,
-      "copy_count": 105
+      "unique_count": 47,
+      "copy_count": 124
     },
     {
       "pool": "lop",
       "sheet": "Set2",
       "filename": "cards_lop.json",
-      "unique_count": 9,
-      "copy_count": 22
+      "unique_count": 10,
+      "copy_count": 24
     },
     {
       "pool": "starter",
