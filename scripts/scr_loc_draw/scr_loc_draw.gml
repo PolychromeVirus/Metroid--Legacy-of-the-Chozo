@@ -71,6 +71,52 @@ function loc_draw() {
             + (_batch_draw_state.replay_active
                 ? " | detailed journal active" : "")
         );
+        var _batch_progress_total = max(1, _batch_draw_state.total_games);
+        var _batch_progress_completed = clamp(
+            _batch_draw_state.completed,
+            0,
+            _batch_progress_total
+        );
+        var _batch_progress = _batch_progress_completed
+            / _batch_progress_total;
+        var _batch_bar_w = min(700, _screen_width - 80);
+        var _batch_bar_h = 24;
+        var _batch_bar_x = floor((_screen_width - _batch_bar_w) * 0.5);
+        var _batch_bar_y = floor(_screen_height * 0.79);
+        draw_set_color(make_color_rgb(20, 31, 43));
+        draw_rectangle(
+            _batch_bar_x,
+            _batch_bar_y,
+            _batch_bar_x + _batch_bar_w,
+            _batch_bar_y + _batch_bar_h,
+            false
+        );
+        if (_batch_progress > 0) {
+            draw_set_color(make_color_rgb(46, 190, 220));
+            draw_rectangle(
+                _batch_bar_x + 3,
+                _batch_bar_y + 3,
+                _batch_bar_x + 3
+                    + floor((_batch_bar_w - 6) * _batch_progress),
+                _batch_bar_y + _batch_bar_h - 3,
+                false
+            );
+        }
+        draw_set_color(make_color_rgb(126, 225, 255));
+        draw_rectangle(
+            _batch_bar_x,
+            _batch_bar_y,
+            _batch_bar_x + _batch_bar_w,
+            _batch_bar_y + _batch_bar_h,
+            true
+        );
+        draw_set_color(c_white);
+        draw_text(
+            _screen_width * 0.5,
+            _batch_bar_y + _batch_bar_h + 22,
+            string(_batch_progress_completed) + " / "
+                + string(_batch_progress_total) + " GAMES COMPLETE"
+        );
         draw_set_font(-1);
         draw_set_halign(fa_left);
         draw_set_valign(fa_top);
@@ -678,21 +724,27 @@ function loc_draw() {
         draw_set_halign(fa_center);
         draw_set_valign(fa_middle);
         draw_set_font(FNT_METROID);
+        var _button_text_pad_x = _camera_control ? 4 : 12;
+        var _button_text_pad_y = _camera_control ? 4 : 8;
+        var _button_text_x = _x + (_width * 0.5)
+            - (_camera_control ? 2 : 0);
+        var _button_text_y = _y + (_height * 0.5)
+            - (_camera_control ? 2 : 0);
         var _button_text_scale = min(
             1,
-            (_width - 12) / max(1, string_width(_label)),
-            (_height - 8) / max(1, string_height(_label))
+            (_width - _button_text_pad_x) / max(1, string_width(_label)),
+            (_height - _button_text_pad_y) / max(1, string_height(_label))
         );
         if (_button_text_scale >= 0.999) {
             draw_text(
-                _x + (_width * 0.5),
-                _y + (_height * 0.5),
+                _button_text_x,
+                _button_text_y,
                 _label
             );
         } else {
             draw_text_transformed(
-                _x + (_width * 0.5),
-                _y + (_height * 0.5),
+                _button_text_x,
+                _button_text_y,
                 _label,
                 _button_text_scale,
                 _button_text_scale,
@@ -1149,10 +1201,19 @@ function loc_draw() {
     draw_line(_log_left, 0, _log_left, _screen_height);
 
     draw_set_color(ui_color_header);
-    draw_rectangle(0, 0, _log_left, _header_h, false);
+    draw_rectangle(0, 0, _screen_width, _header_h, false);
     draw_set_color(ui_color_title);
     draw_set_font(FNT_METROID);
-    draw_text(_margin, 13, "LEGACY OF THE CHOZO - RULES ENGINE");
+    draw_set_valign(fa_middle);
+    var _header_starter = get_leader_identity_config(
+        _active_player.leader_identity_id
+    );
+    draw_text(
+        _margin,
+        _header_h * 0.5,
+        "STARTER DECK: " + string_upper(_header_starter.name)
+    );
+    draw_set_valign(fa_top);
     draw_set_font(-1);
     draw_set_halign(fa_center);
     draw_set_color(ui_color_text);
@@ -1175,44 +1236,66 @@ function loc_draw() {
                 : "")
     );
     draw_set_halign(fa_right);
-    draw_set_color(load_complete ? ui_color_success : ui_color_error);
-    draw_text(
-        _log_left - 12,
-        13,
-        load_complete ? "STATE OK" : "STATE ERROR"
-    );
+    if (settings_debug_mode || !load_complete) {
+        draw_set_color(load_complete ? ui_color_success : ui_color_error);
+        draw_text(
+            _log_left - 12,
+            13,
+            load_complete ? "STATE OK" : "STATE ERROR"
+        );
+    }
     draw_set_halign(fa_left);
 
     var _watch_header = game_state.game_mode == "ai_watch";
-    var _header_control_x = _log_left;
-    if (settings_debug_mode) {
-        _draw_action_button("TEST TOOLS", "test_open", _header_control_x, 8,
-            _watch_header ? 88 : 104, 32, is_undefined(pending_choice));
-        _header_control_x += _watch_header ? 94 : 110;
-    }
-    if (_watch_header && settings_debug_mode) {
-        _draw_action_button("SIM", "test_game_over", _log_left + 94, 8,
-            48, 32, game_state.phase != "game_over");
-        _header_control_x = _log_left + 148;
-    }
+    var _header_control_x = _log_left + 86;
+    draw_set_font(FNT_METROID);
+    draw_set_valign(fa_middle);
+    draw_set_halign(fa_right);
+    draw_set_color(ui_color_title);
+    draw_text(_header_control_x - 16, _header_h * 0.5, "CAMERA:");
+    draw_set_halign(fa_left);
+    draw_set_valign(fa_top);
+    draw_set_font(-1);
     _draw_action_button(
-        board_camera_center_far ? "CENTER: FAR" : "CENTER: CLOSE",
+        board_camera_center_far ? "FAR" : "CLOSE",
         "camera_center_toggle",
         _header_control_x,
         8,
-        _watch_header ? 100 : 120,
+        62,
         32,
         true
     );
     _draw_action_button(
-        board_camera_locked ? "CAMERA: LOCKED" : "CAMERA: FREE",
+        board_camera_locked ? "LOCKED" : "UNLOCKED",
         "camera_lock_toggle",
-        _header_control_x + (_watch_header ? 106 : 126),
+        _header_control_x + 68,
         8,
-        _watch_header ? 98 : 116,
+        84,
         32,
         true
     );
+    if (settings_debug_mode) {
+        var _debug_control_x = _header_control_x + 158;
+        var _debug_available_w = max(44, _screen_width - _debug_control_x - 8);
+        if (_watch_header) {
+            var _sim_button_w = 42;
+            var _test_button_w = max(44, _debug_available_w - _sim_button_w - 6);
+            _draw_action_button(
+                "TEST", "test_open", _debug_control_x, 8,
+                _test_button_w, 32, is_undefined(pending_choice)
+            );
+            _draw_action_button(
+                "SIM", "test_game_over",
+                _debug_control_x + _test_button_w + 6, 8,
+                _sim_button_w, 32, game_state.phase != "game_over"
+            );
+        } else {
+            _draw_action_button(
+                "TEST TOOLS", "test_open", _debug_control_x, 8,
+                _debug_available_w, 32, is_undefined(pending_choice)
+            );
+        }
+    }
 
     // Everything from the opponent surface through the local hand belongs to the
     // fixed board world. The dashboard and modal overlays drawn afterward remain
@@ -1550,7 +1633,7 @@ function loc_draw() {
                             pending_choice.stage == "attackers"
                                 ? pending_choice.attacker_characters
                                 : pending_choice.defender_characters,
-                            _opponent_logical_index
+                            _opponent_card.instance_id
                         );
                     _opponent_raid_selected = _opponent_raid_selected
                         || (_opponent_raid_ability
@@ -4250,24 +4333,19 @@ function loc_draw() {
     // region names so this remains correct in hotseat and fixed-view modes.
     if (!is_undefined(pending_choice)
     && pending_choice.kind == "raid"
-    && pending_choice.defender_ship_index >= 0) {
+    && pending_choice.defender_ship_id >= 0) {
         var _raid_line_attacker_player =
             game_state.players[game_state.active_player];
         var _raid_line_defender_player =
             game_state.players[1 - game_state.active_player];
-        if (pending_choice.attacker_ship_index >= 0
-        && pending_choice.attacker_ship_index
-        < array_length(_raid_line_attacker_player.board.ships)
-        && pending_choice.defender_ship_index
-        < array_length(_raid_line_defender_player.board.ships)) {
-            var _raid_line_attacker =
-                _raid_line_attacker_player.board.ships[
-                    pending_choice.attacker_ship_index
-                ];
-            var _raid_line_defender =
-                _raid_line_defender_player.board.ships[
-                    pending_choice.defender_ship_index
-                ];
+        var _raid_line_attacker = raid_get_ship(
+            _raid_line_attacker_player, pending_choice.attacker_ship_id
+        );
+        var _raid_line_defender = raid_get_ship(
+            _raid_line_defender_player, pending_choice.defender_ship_id
+        );
+        if (!is_undefined(_raid_line_attacker)
+        && !is_undefined(_raid_line_defender)) {
             var _raid_line_source_region = undefined;
             var _raid_line_target_region = undefined;
             for (var _raid_line_region_index = 0;
@@ -4871,13 +4949,12 @@ function loc_draw() {
                     game_state.players[1 - game_state.active_player];
 
                 _raid_attack_total = pending_choice.attacker_ability_bonus;
-                if (pending_choice.attacker_ship_index >= 0
-                && pending_choice.attacker_ship_index
-                < array_length(_raid_attack_player.board.ships)) {
+                var _raid_attack_ship = raid_get_ship(
+                    _raid_attack_player, pending_choice.attacker_ship_id
+                );
+                if (!is_undefined(_raid_attack_ship)) {
                     _raid_attack_total += get_card_stat(
-                        _raid_attack_player.board.ships[
-                            pending_choice.attacker_ship_index
-                        ],
+                        _raid_attack_ship,
                         "raid_attacker_ship"
                     );
                 }
@@ -4885,13 +4962,13 @@ function loc_draw() {
                      _raid_attack_character_index
                      < array_length(pending_choice.attacker_characters);
                      _raid_attack_character_index++) {
-                    var _raid_attack_board_index =
+                    var _raid_attack_board_index = raid_find_instance_index(
+                        _raid_attack_player.board.characters,
                         pending_choice.attacker_characters[
                             _raid_attack_character_index
-                        ];
-                    if (_raid_attack_board_index >= 0
-                    && _raid_attack_board_index
-                    < array_length(_raid_attack_player.board.characters)) {
+                        ]
+                    );
+                    if (_raid_attack_board_index >= 0) {
                         var _raid_attack_character =
                             _raid_attack_player.board.characters[
                                 _raid_attack_board_index
@@ -4905,16 +4982,14 @@ function loc_draw() {
                     }
                 }
 
-                _raid_defense_known =
-                    pending_choice.defender_ship_index >= 0
-                    && pending_choice.defender_ship_index
-                    < array_length(_raid_defense_player.board.ships);
+                var _raid_defense_ship = raid_get_ship(
+                    _raid_defense_player, pending_choice.defender_ship_id
+                );
+                _raid_defense_known = !is_undefined(_raid_defense_ship);
                 _raid_defense_total = pending_choice.defender_ability_bonus;
                 if (_raid_defense_known) {
                     _raid_defense_total += get_card_stat(
-                        _raid_defense_player.board.ships[
-                            pending_choice.defender_ship_index
-                        ],
+                        _raid_defense_ship,
                         "raid_defender_ship"
                     );
                 }
@@ -4922,21 +4997,21 @@ function loc_draw() {
                      _raid_defense_character_index
                      < array_length(pending_choice.defender_characters);
                      _raid_defense_character_index++) {
-                    var _raid_defense_board_index =
+                    var _raid_defense_board_index = raid_find_instance_index(
+                        _raid_defense_player.board.characters,
                         pending_choice.defender_characters[
                             _raid_defense_character_index
-                        ];
-                    if (_raid_defense_board_index >= 0
-                    && _raid_defense_board_index
-                    < array_length(_raid_defense_player.board.characters)) {
+                        ]
+                    );
+                    if (_raid_defense_board_index >= 0) {
                         var _raid_defense_character =
                             _raid_defense_player.board.characters[
                                 _raid_defense_board_index
                             ];
                         if (_raid_defense_character.ready) {
-                            _raid_defense_total += get_card_stat(
+                            _raid_defense_total += raid_character_contribution(
                                 _raid_defense_character,
-                                "raid_character"
+                                _raid_defense_ship
                             );
                         }
                     }
@@ -5122,14 +5197,18 @@ function loc_draw() {
         || pending_choice.kind == "olympus_ready") {
             // Selection instruction is shown in the transmission panel.
         } else if (pending_choice.kind == "raid_cargo") {
-            var _cargo_choice_ship = pending_choice.winner_is_attacker
-                ? game_state.players[
-                    1 - game_state.active_player
-                ].board.ships[pending_choice.defender_ship_index]
-                : game_state.players[
-                    game_state.active_player
-                ].board.ships[pending_choice.attacker_ship_index];
-            var _cargo_choice_count = min(4, array_length(_cargo_choice_ship.cargo));
+            var _cargo_choice_player = pending_choice.winner_is_attacker
+                ? game_state.players[1 - game_state.active_player]
+                : game_state.players[game_state.active_player];
+            var _cargo_choice_ship = raid_get_ship(
+                _cargo_choice_player,
+                pending_choice.winner_is_attacker
+                    ? pending_choice.defender_ship_id
+                    : pending_choice.attacker_ship_id
+            );
+            var _cargo_choice_count = is_undefined(_cargo_choice_ship)
+                ? 0
+                : min(4, array_length(_cargo_choice_ship.cargo));
             for (var _cargo_choice_index = 0;
                  _cargo_choice_index < _cargo_choice_count;
                  _cargo_choice_index++) {
@@ -5184,7 +5263,7 @@ function loc_draw() {
                     : pending_choice.defender_characters;
                 var _raid_is_contributing = _raid_is_character
                     && raid_array_contains(
-                        _raid_contributors, ui_selected_index
+                        _raid_contributors, _raid_source.instance_id
                     );
                 if (_raid_is_character
                 && (_raid_source.ready || _raid_is_contributing)) {
@@ -5646,7 +5725,7 @@ function loc_draw() {
             _diagnostic_y
         );
         _diagnostic_y += 8;
-    } else {
+    } else if (settings_debug_mode) {
         draw_set_color(ui_color_success);
         draw_text(_log_left + 12, _diagnostic_y, "State checks passed.");
         _diagnostic_y += 27;
@@ -6895,6 +6974,10 @@ function loc_draw() {
             "ai", "hotseat", "network", "ai_watch",
             "settings", "help", "batch", "regression"
         ];
+        if (!settings_debug_mode) {
+            array_delete(_mode_labels, 6, 2);
+            array_delete(_mode_keys, 6, 2);
+        }
         var _mode_y = _title_content_top;
         var _mode_gap = 4;
         var _mode_button_h = min(
@@ -6918,9 +7001,7 @@ function loc_draw() {
                 _mode_y + _mode_index * (_mode_button_h + _mode_gap),
                 _title_left_w,
                 _mode_button_h,
-                _mode_key != "batch" && _mode_key != "regression"
-                    ? true
-                    : settings_debug_mode
+                true
             );
         }
 
@@ -7119,17 +7200,21 @@ function loc_draw() {
         }
         draw_set_halign(fa_center);
         draw_set_color(ui_color_muted);
-        draw_text(
-            _screen_width * 0.5,
-            _title_panel_y + _title_panel_h - 24,
-            variable_global_exists("loc_regression_last")
-                ? "Regression: "
+        if (variable_global_exists("loc_regression_last")) {
+            draw_text(
+                _screen_width * 0.5,
+                _title_panel_y + _title_panel_h - 24,
+                "Regression: "
                     + string(global.loc_regression_last.passed) + " passed, "
                     + string(global.loc_regression_last.failed) + " failed"
-                : (variable_global_exists("loc_batch_last_summary")
-                    ? "Last batch complete; report path printed to output"
-                    : "Press R at any time to restart")
-        );
+            );
+        } else if (variable_global_exists("loc_batch_last_summary")) {
+            draw_text(
+                _screen_width * 0.5,
+                _title_panel_y + _title_panel_h - 24,
+                "Last batch complete; report path printed to output"
+            );
+        }
         draw_set_halign(fa_left);
 
         if (settings_menu_active) {
@@ -8188,6 +8273,7 @@ function loc_draw() {
                             switch (_tooltip_ability.effect_kind) {
                                 case "gain_cp": _tooltip_body = "Gain 1 CP."; break;
                                 case "raid_defense_1": _tooltip_body = "Gain +1 defense during this raid."; break;
+                                case "tyr_raid_support": _tooltip_body = "Exhaust G.F.S. Tyr to give the raided Ship +2 Security if it is Galactic Federation, or +1 otherwise."; break;
                                 case "corrupt_all": _tooltip_body = "Put a Phazon token on every other permanent in play."; break;
                                 case "prepare_bh_refund": _tooltip_body = "The next Bounty Hunter you play this turn refunds 1 CP."; break;
                                 case "prepare_gf_double": _tooltip_body = "Double the next Galactic Federation activated effect you use this turn."; break;
@@ -8212,6 +8298,10 @@ function loc_draw() {
                                     == "raid_defense_1") {
                                     _tooltip_unavailable =
                                         "only while defending a raid";
+                                } else if (_tooltip_ability.effect_kind
+                                    == "tyr_raid_support") {
+                                    _tooltip_unavailable =
+                                        "no other ship being raided";
                                 } else if (_tooltip_ability.target_kind != "") {
                                     _tooltip_unavailable = "no valid targets";
                                 }

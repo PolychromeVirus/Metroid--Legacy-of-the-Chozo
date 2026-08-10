@@ -618,6 +618,9 @@ function loc_ai() {
             _defender,
             "raid_defender_ship"
         );
+        _defender_base += raid_tyr_support_potential(
+            _defender_player, _defender
+        );
         var _ready_defender_strength = 0;
         var _defender_strengths = [];
         for (var _defender_character_index = 0;
@@ -627,9 +630,9 @@ function loc_ai() {
             var _defender_character =
                 _defender_player.board.characters[_defender_character_index];
             if (_defender_character.ready) {
-                var _defender_strength = get_card_stat(
+                var _defender_strength = raid_character_contribution(
                     _defender_character,
-                    "raid_defender_character"
+                    _defender
                 );
                 _ready_defender_strength += _defender_strength;
                 array_push(_defender_strengths, _defender_strength);
@@ -730,6 +733,9 @@ function loc_ai() {
             }
         }
         var _defender_max = get_card_stat(_defender, "raid_defender_ship");
+        _defender_max += raid_tyr_support_potential(
+            _defender_player, _defender
+        );
         for (var _defender_character_index = 0;
              _defender_character_index
                 < array_length(_defender_player.board.characters);
@@ -737,9 +743,9 @@ function loc_ai() {
             var _defender_character =
                 _defender_player.board.characters[_defender_character_index];
             if (_defender_character.ready) {
-                _defender_max += get_card_stat(
+                _defender_max += raid_character_contribution(
                     _defender_character,
-                    "raid_defender_character"
+                    _defender
                 );
             }
         }
@@ -797,12 +803,15 @@ function loc_ai() {
         var _raid = pending_choice;
         var _attacker_player = game_state.players[game_state.active_player];
         var _defender_player = game_state.players[1 - game_state.active_player];
-        var _attacker = _attacker_player.board.ships[
-            _raid.attacker_ship_index
-        ];
-        var _defender = _defender_player.board.ships[
-            _raid.defender_ship_index
-        ];
+        var _attacker = raid_get_ship(
+            _attacker_player, _raid.attacker_ship_id
+        );
+        var _defender = raid_get_ship(
+            _defender_player, _raid.defender_ship_id
+        );
+        if (is_undefined(_attacker) || is_undefined(_defender)) {
+            return resolve_raid();
+        }
         var _attacker_total = get_card_stat(
             _attacker,
             "raid_attacker_ship"
@@ -811,12 +820,16 @@ function loc_ai() {
              _attacker_character_index
                 < array_length(_raid.attacker_characters);
              _attacker_character_index++) {
-            _attacker_total += get_card_stat(
-                _attacker_player.board.characters[
-                    _raid.attacker_characters[_attacker_character_index]
-                ],
-                "raid_attacker_character"
+            var _committed_attacker_index = raid_find_instance_index(
+                _attacker_player.board.characters,
+                _raid.attacker_characters[_attacker_character_index]
             );
+            if (_committed_attacker_index >= 0) {
+                _attacker_total += get_card_stat(
+                    _attacker_player.board.characters[_committed_attacker_index],
+                    "raid_attacker_character"
+                );
+            }
         }
         var _defender_base = get_card_stat(
             _defender,
@@ -832,14 +845,73 @@ function loc_ai() {
                 _defender_player.board.characters[_defender_character_index];
             if (_defender_character.ready) {
                 array_push(_available_indices, _defender_character_index);
-                _available_strength += get_card_stat(
+                _available_strength += raid_character_contribution(
                     _defender_character,
-                    "raid_defender_character"
+                    _defender
                 );
             }
         }
 
         var _maximum_without_ability = _defender_base + _available_strength;
+        if (_maximum_without_ability <= _attacker_total) {
+            var _tyr_supporters = [];
+            var _tyr_support_total = 0;
+            var _tyr_support_value = card_has_faction(_defender, "GF") ? 2 : 1;
+            for (var _tyr_ship_index = 0;
+                 _tyr_ship_index < array_length(_defender_player.board.ships);
+                 _tyr_ship_index++) {
+                var _tyr_ship = _defender_player.board.ships[_tyr_ship_index];
+                if (_tyr_ship.definition_id == "loc.g_f_s_tyr"
+                && _tyr_ship.instance_id != _defender.instance_id
+                && _tyr_ship.ready) {
+                    array_push(_tyr_supporters, _tyr_ship.instance_id);
+                    _tyr_support_total += _tyr_support_value;
+                }
+            }
+            if (_maximum_without_ability + _tyr_support_total
+            > _attacker_total) {
+                for (var _tyr_support_index = 0;
+                     _tyr_support_index < array_length(_tyr_supporters)
+                        && _maximum_without_ability <= _attacker_total;
+                     _tyr_support_index++) {
+                    var _current_tyr_index = raid_find_instance_index(
+                        _defender_player.board.ships,
+                        _tyr_supporters[_tyr_support_index]
+                    );
+                    if (_current_tyr_index < 0) continue;
+                    var _current_tyr = _defender_player.board.ships[
+                        _current_tyr_index
+                    ];
+                    var _current_tyr_abilities = get_activated_abilities(
+                        _current_tyr
+                    );
+                    for (var _current_tyr_ability_index = 0;
+                         _current_tyr_ability_index
+                            < array_length(_current_tyr_abilities);
+                         _current_tyr_ability_index++) {
+                        if (_current_tyr_abilities[
+                            _current_tyr_ability_index
+                        ].effect_kind == "tyr_raid_support") {
+                            if (activate_selected_ability(
+                                "opponent_ship",
+                                _current_tyr_index,
+                                _current_tyr_ability_index
+                            )) {
+                                _maximum_without_ability += _tyr_support_value;
+                                _defender_base += _tyr_support_value;
+                                ai_debug_log(
+                                    "Raid defense: G.F.S. Tyr added +"
+                                        + string(_tyr_support_value)
+                                        + " Security to "
+                                        + _defender.definition.name + "."
+                                );
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+        }
         if (_maximum_without_ability <= _attacker_total
         && _defender_player.command_points > 0
         && _maximum_without_ability + _defender_player.command_points
@@ -902,23 +974,39 @@ function loc_ai() {
             && array_length(_available_indices) > 0) {
                 var _best_position = 0;
                 var _best_strength = -1;
+                var _best_commitment_score = -100000;
                 for (var _candidate_position = 0;
                      _candidate_position < array_length(_available_indices);
                      _candidate_position++) {
                     var _candidate_index =
                         _available_indices[_candidate_position];
-                    var _candidate_strength = get_card_stat(
+                    var _candidate_strength = raid_character_contribution(
                         _defender_player.board.characters[_candidate_index],
-                        "raid_defender_character"
+                        _defender
                     );
-                    if (_candidate_strength > _best_strength) {
+                    var _candidate_card = _defender_player.board.characters[
+                        _candidate_index
+                    ];
+                    var _candidate_commitment_score = _candidate_strength * 100;
+                    if (_candidate_card.definition_id == "loc.gf_soldier"
+                    && array_length(_attacker_player.lab) > 0) {
+                        // Preserve the post-defense breach trigger when another
+                        // equal contributor can secure the same Raid result.
+                        _candidate_commitment_score -= 50;
+                    }
+                    if (_candidate_commitment_score
+                    > _best_commitment_score) {
                         _best_strength = _candidate_strength;
+                        _best_commitment_score = _candidate_commitment_score;
                         _best_position = _candidate_position;
                     }
                 }
                 var _chosen_index = _available_indices[_best_position];
                 array_delete(_available_indices, _best_position, 1);
-                array_push(_raid.defender_characters, _chosen_index);
+                array_push(
+                    _raid.defender_characters,
+                    _defender_player.board.characters[_chosen_index].instance_id
+                );
                 _defense_total += _best_strength;
             }
             ai_debug_log(
@@ -956,8 +1044,12 @@ function loc_ai() {
                             ].board.ships
                          );
                          _raid_target_index++) {
+                        var _raid_plan_attacker_index = raid_find_instance_index(
+                            game_state.players[game_state.active_player].board.ships,
+                            _choice.attacker_ship_id
+                        );
                         var _raid_score = ai_raid_plan_score(
-                            _choice.attacker_ship_index,
+                            _raid_plan_attacker_index,
                             _raid_target_index
                         );
                         if (_raid_score > _best_raid_score) {
@@ -977,17 +1069,25 @@ function loc_ai() {
                         game_state.players[game_state.active_player];
                     var _raid_defender_player =
                         game_state.players[1 - game_state.active_player];
-                    var _raid_attacker_ship =
-                        _raid_attacker_player.board.ships[
-                            _choice.attacker_ship_index
-                        ];
-                    var _raid_defender_ship =
-                        _raid_defender_player.board.ships[
-                            _choice.defender_ship_index
-                        ];
+                    var _raid_live_attacker_index = raid_find_instance_index(
+                        _raid_attacker_player.board.ships,
+                        _choice.attacker_ship_id
+                    );
+                    var _raid_live_defender_index = raid_find_instance_index(
+                        _raid_defender_player.board.ships,
+                        _choice.defender_ship_id
+                    );
+                    var _raid_attacker_ship = raid_get_ship(
+                        _raid_attacker_player, _choice.attacker_ship_id
+                    );
+                    var _raid_defender_ship = raid_get_ship(
+                        _raid_defender_player, _choice.defender_ship_id
+                    );
+                    if (is_undefined(_raid_attacker_ship)
+                    || is_undefined(_raid_defender_ship)) return resolve_raid();
                     var _exhaustion_raid_score = ai_raid_exhaustion_score(
-                        _choice.attacker_ship_index,
-                        _choice.defender_ship_index
+                        _raid_live_attacker_index,
+                        _raid_live_defender_index
                     );
                     if (_exhaustion_raid_score > -100000) {
                         _choice.attacker_characters = [];
@@ -1066,7 +1166,7 @@ function loc_ai() {
                             if (_attacker_option.ready
                             && !raid_array_contains(
                                 _choice.attacker_characters,
-                                _attacker_option_index
+                                _attacker_option.instance_id
                             )) {
                                 var _attacker_strength = get_card_stat(
                                     _attacker_option,
@@ -1081,7 +1181,9 @@ function loc_ai() {
                         if (_best_attacker_index < 0) break;
                         array_push(
                             _choice.attacker_characters,
-                            _best_attacker_index
+                            _raid_attacker_player.board.characters[
+                                _best_attacker_index
+                            ].instance_id
                         );
                         _attack_total += _best_attacker_strength;
                     }
@@ -1153,7 +1255,9 @@ function loc_ai() {
                 var _ghost_targets = game_state.players[
                     _choice.target_player_index
                 ].board.characters;
-                if (array_length(_ghost_targets) <= 0) return false;
+                if (array_length(_ghost_targets) <= 0) {
+                    return resolve_chozo_ghosts_target(undefined);
+                }
                 var _ghost_target = _ghost_targets[0];
                 var _ghost_target_value = ai_card_utility(
                     _ghost_target,
@@ -1426,13 +1530,15 @@ function loc_ai() {
                 return resolve_faction_choice(_chosen_faction);
 
             case "raid_cargo":
-                var _losing_ship = _choice.winner_is_attacker
-                    ? game_state.players[
-                        1 - game_state.active_player
-                    ].board.ships[_choice.defender_ship_index]
-                    : game_state.players[
-                        game_state.active_player
-                    ].board.ships[_choice.attacker_ship_index];
+                var _losing_player = _choice.winner_is_attacker
+                    ? game_state.players[1 - game_state.active_player]
+                    : game_state.players[game_state.active_player];
+                var _losing_ship = raid_get_ship(
+                    _losing_player,
+                    _choice.winner_is_attacker
+                        ? _choice.defender_ship_id
+                        : _choice.attacker_ship_id
+                );
                 if (is_undefined(_losing_ship)
                 || !variable_struct_exists(_losing_ship, "cargo")
                 || array_length(_losing_ship.cargo) <= 0) {

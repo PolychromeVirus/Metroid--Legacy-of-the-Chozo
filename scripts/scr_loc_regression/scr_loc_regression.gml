@@ -4,6 +4,8 @@ function loc_regression() {
         var _saved_pending_choice = pending_choice;
         var _saved_containment = containment_resolution;
         var _saved_special = special_containment_sequence;
+        var _saved_chozo_ghosts_end_turn = chozo_ghosts_end_turn;
+        var _saved_gf_soldier_breach_sequence = gf_soldier_breach_sequence;
         var _saved_next_card_id = next_card_instance_id;
         var _saved_next_metroid_id = next_metroid_instance_id;
         var _saved_faction_starters_enabled = faction_starters_enabled;
@@ -16,20 +18,32 @@ function loc_regression() {
             if (_condition) {
                 passed += 1;
                 array_push(lines, "PASS: " + _name);
+                show_debug_message("REGRESSION PASS: " + _name);
             } else {
                 failed += 1;
                 array_push(
                     lines,
                     "FAIL: " + _name + " - " + _detail
                 );
+                show_debug_message(
+                    "REGRESSION FAIL: " + _name + " - " + _detail
+                );
             }
+            global.loc_regression_progress = {
+                passed: passed,
+                failed: failed,
+                current: _name
+            };
         });
         var _reset = function() {
             pending_choice = undefined;
             containment_resolution = undefined;
             special_containment_sequence = undefined;
+            chozo_ghosts_end_turn = undefined;
+            gf_soldier_breach_sequence = undefined;
             game_state = {
                 seed: 388,
+                started_at_ms: current_time,
                 turn_number: 1,
                 active_player: 0,
                 priority_player: 0,
@@ -59,6 +73,12 @@ function loc_regression() {
             };
         };
         try {
+            global.loc_regression_progress = {
+                passed: 0,
+                failed: 0,
+                current: "Starting regression tests"
+            };
+            show_debug_message("REGRESSION: starting suite");
             _reset();
             var _gray = make_card_instance(
                 get_card_definition("loc.gray_voice"), 0, "board"
@@ -405,7 +425,8 @@ function loc_regression() {
                 "loc.gf_marine",
                 "loc.ghor",
                 "loc.attack_vessel",
-                "loc.quiet_robe"
+                "loc.quiet_robe",
+                "loc.gf_soldier"
             ];
             for (var _queen_deck_setup_index = 0;
                  _queen_deck_setup_index < array_length(_queen_test_ids);
@@ -427,12 +448,12 @@ function loc_regression() {
             refill_shop();
             _assert(
                 array_length(game_state.shop_row) == 5
-                && !is_undefined(pending_choice)
-                && pending_choice.kind == "queen_event"
-                && pending_choice.stage == "revealed"
-                && pending_choice.shop_index == 0,
-                "Queen waits for every Shop slot to refill before activating",
-                "Queen interrupted refill before the Shop row reached five cards."
+                && is_undefined(pending_choice)
+                && array_length(game_state.shop_deck) == 1
+                && game_state.shop_deck[0].definition_id
+                    == "loc.queen_metroid_awakens",
+                "Queen resolves after the Shop fills and receives a replacement",
+                "Queen interrupted refill or immediately replaced itself."
             );
 
             _reset();
@@ -554,7 +575,6 @@ function loc_regression() {
             random_set_seed(388);
             finish_queen_shop_event();
             var _queen_returned_to_deck = false;
-            var _queen_immediately_redrawn = false;
             for (var _queen_deck_index = 0;
                  _queen_deck_index < array_length(game_state.shop_deck);
                  _queen_deck_index++) {
@@ -564,26 +584,14 @@ function loc_regression() {
                     break;
                 }
             }
-            for (var _queen_redraw_index = 0;
-                 _queen_redraw_index < array_length(game_state.shop_row);
-                 _queen_redraw_index++) {
-                if (game_state.shop_row[_queen_redraw_index].instance_id
-                    == _queen_card.instance_id) {
-                    _queen_immediately_redrawn = true;
-                    break;
-                }
-            }
             _assert(
                 array_length(game_state.shop_row) == 5
                 && array_length(game_state.shop_deck) == 3
                 && array_length(game_state.shop_discard) == 0
-                && (_queen_returned_to_deck || _queen_immediately_redrawn)
-                && (!_queen_immediately_redrawn
-                    || (!is_undefined(pending_choice)
-                        && pending_choice.kind == "queen_event"
-                        && pending_choice.stage == "revealed")),
+                && _queen_returned_to_deck
+                && is_undefined(pending_choice),
                 "Queen recycles an exhausted Shop deck before replacement",
-                "Queen was neither returned to the deck nor legally redrawn."
+                "Queen was lost or immediately redrawn during resolution."
             );
 
             _reset();
@@ -729,6 +737,187 @@ function loc_regression() {
             );
 
             _reset();
+            var _ghost_ai_source = make_card_instance(
+                get_card_definition("lop.chozo_ghosts"), 0, "discard"
+            );
+            var _ghost_ai_target = make_card_instance(
+                get_card_definition("loc.gf_marine"), 1, "board"
+            );
+            // Reproduce the stale metadata from the invalid batch match: the
+            // Character is physically on Player 2's board, which determines
+            // whether it is an opposing Character.
+            _ghost_ai_target.controller = 0;
+            array_push(
+                game_state.players[1].board.characters,
+                _ghost_ai_target
+            );
+            chozo_ghosts_end_turn = {
+                ghosts: [{owner: 0, card: _ghost_ai_source}],
+                index: 0,
+                ends_final_round: false
+            };
+            pending_choice = {
+                kind: "chozo_ghosts_target",
+                player_index: 0,
+                target_player_index: 1,
+                tokens: 3,
+                prompt: ""
+            };
+            var _ghost_ai_resolved = resolve_chozo_ghosts_target(
+                _ghost_ai_target
+            );
+            _assert(
+                _ghost_ai_resolved
+                && _ghost_ai_target.phazon_tokens == 3
+                && (is_undefined(pending_choice)
+                    || pending_choice.kind != "chozo_ghosts_target"),
+                "Chozo Ghosts AI resolves targets with stale controller metadata",
+                "The legal opposing board target remained pending forever."
+            );
+
+            _reset();
+            var _tyr_test_olympus = make_card_instance(
+                get_card_definition("loc.g_f_s_olympus"), 1, "board"
+            );
+            var _tyr_test_source = make_card_instance(
+                get_card_definition("loc.g_f_s_tyr"), 1, "board"
+            );
+            var _tyr_test_aurora = make_card_instance(
+                get_card_definition("lop.aurora_unit_217"), 1, "attachment"
+            );
+            array_push(_tyr_test_olympus.attachments, _tyr_test_aurora);
+            array_push(
+                game_state.players[1].board.ships,
+                _tyr_test_olympus
+            );
+            array_push(
+                game_state.players[1].board.ships,
+                _tyr_test_source
+            );
+            game_state.priority_player = 1;
+            pending_choice = {
+                kind: "raid",
+                stage: "defenders",
+                attacker_ship_id: -1,
+                defender_ship_id: _tyr_test_olympus.instance_id,
+                attacker_characters: [],
+                defender_characters: [],
+                attacker_ability_bonus: 0,
+                defender_ability_bonus: 0
+            };
+            var _tyr_test_resolved = activate_selected_ability(
+                "opponent_ship", 1, 0
+            );
+            _assert(
+                _tyr_test_resolved
+                && !_tyr_test_source.ready
+                && _tyr_test_olympus.temporary_stat_bonus == 2
+                && _tyr_test_source.phazon_tokens == 1,
+                "G.F.S. Tyr supports a GF Phazon Ship and becomes corrupted",
+                "Tyr's Security bonus, exhaustion, or Phazon interaction failed."
+            );
+
+            _reset();
+            var _olympus_test_ship = make_card_instance(
+                get_card_definition("loc.g_f_s_olympus"), 1, "board"
+            );
+            var _olympus_test_gf = make_card_instance(
+                get_card_definition("loc.gf_marine"), 1, "board"
+            );
+            var _olympus_test_neutral = make_card_instance(
+                get_card_definition("loc.private_military"), 1, "board"
+            );
+            array_push(
+                game_state.players[1].board.characters,
+                _olympus_test_gf
+            );
+            array_push(
+                game_state.players[1].board.characters,
+                _olympus_test_neutral
+            );
+            var _olympus_base_contribution = get_card_stat(
+                _olympus_test_gf, "raid_character"
+            ) + get_card_stat(_olympus_test_neutral, "raid_character");
+            var _olympus_actual_contribution = raid_exhaust_characters(
+                game_state.players[1],
+                [
+                    _olympus_test_gf.instance_id,
+                    _olympus_test_neutral.instance_id
+                ],
+                _olympus_test_ship
+            );
+            _assert(
+                _olympus_actual_contribution
+                    == _olympus_base_contribution + 1,
+                "G.F.S. Olympus adds one Strength per GF defender",
+                "Olympus buffed the wrong faction or missed its GF Character."
+            );
+
+            _reset();
+            var _soldier_raid_attacker = make_card_instance(
+                get_card_definition("loc.light_shuttle"), 0, "board"
+            );
+            var _soldier_raid_defender = make_card_instance(
+                get_card_definition("loc.light_shuttle"), 1, "board"
+            );
+            var _soldier_raid_trigger = make_card_instance(
+                get_card_definition("loc.gf_soldier"), 0, "board"
+            );
+            var _soldier_raid_casualty = make_card_instance(
+                get_card_definition("loc.private_military"), 1, "board"
+            );
+            array_push(
+                game_state.players[0].board.ships,
+                _soldier_raid_attacker
+            );
+            array_push(
+                game_state.players[1].board.ships,
+                _soldier_raid_defender
+            );
+            array_push(
+                game_state.players[0].board.characters,
+                _soldier_raid_trigger
+            );
+            array_push(
+                game_state.players[1].board.characters,
+                _soldier_raid_casualty
+            );
+            array_push(
+                game_state.players[1].lab,
+                create_metroid_for_stage(4)
+            );
+            array_push(
+                game_state.players[1].lab,
+                create_metroid_for_stage(1)
+            );
+            pending_choice = {
+                kind: "raid",
+                stage: "defenders",
+                attacker_ship_id: _soldier_raid_attacker.instance_id,
+                defender_ship_id: _soldier_raid_defender.instance_id,
+                attacker_characters: [],
+                defender_characters: [],
+                attacker_ability_bonus: 0,
+                defender_ability_bonus: 2
+            };
+            var _soldier_raid_resolved = resolve_raid();
+            var _soldier_breach_waited = _soldier_raid_resolved
+                && !_soldier_raid_trigger.ready
+                && !is_undefined(pending_choice)
+                && pending_choice.kind == "breach_character"
+                && pending_choice.gf_soldier_breach;
+            resolve_breach_character_choice(0);
+            _assert(
+                _soldier_breach_waited
+                && array_length(game_state.players[1].lab) == 1
+                && game_state.players[1].lab[0].definition.stage == 4
+                && array_length(game_state.players[1].board.characters) == 0
+                && is_undefined(gf_soldier_breach_sequence),
+                "GF Soldier triggers when its controller's attacking Ship is destroyed",
+                "The Soldier failed to exhaust or breach the opponent's lowest-stage Metroid."
+            );
+
+            _reset();
             var _tie_attacker = make_card_instance(
                 get_card_definition("loc.light_shuttle"), 0, "board"
             );
@@ -740,8 +929,8 @@ function loc_regression() {
             pending_choice = {
                 kind: "raid",
                 stage: "defenders",
-                attacker_ship_index: 0,
-                defender_ship_index: 0,
+                attacker_ship_id: game_state.players[0].board.ships[0].instance_id,
+                defender_ship_id: game_state.players[1].board.ships[0].instance_id,
                 attacker_characters: [],
                 defender_characters: [],
                 attacker_ability_bonus: 0,
@@ -771,8 +960,8 @@ function loc_regression() {
             pending_choice = {
                 kind: "raid",
                 stage: "defenders",
-                attacker_ship_index: 0,
-                defender_ship_index: 0,
+                attacker_ship_id: game_state.players[0].board.ships[0].instance_id,
+                defender_ship_id: game_state.players[1].board.ships[0].instance_id,
                 attacker_characters: [],
                 defender_characters: [],
                 attacker_ability_bonus: 0,
@@ -804,8 +993,8 @@ function loc_regression() {
             pending_choice = {
                 kind: "raid",
                 stage: "defenders",
-                attacker_ship_index: 0,
-                defender_ship_index: 0,
+                attacker_ship_id: game_state.players[0].board.ships[0].instance_id,
+                defender_ship_id: game_state.players[1].board.ships[0].instance_id,
                 attacker_characters: [],
                 defender_characters: [],
                 attacker_ability_bonus: 0,
@@ -836,8 +1025,8 @@ function loc_regression() {
             pending_choice = {
                 kind: "raid",
                 stage: "defenders",
-                attacker_ship_index: 0,
-                defender_ship_index: 0,
+                attacker_ship_id: game_state.players[0].board.ships[0].instance_id,
+                defender_ship_id: game_state.players[1].board.ships[0].instance_id,
                 attacker_characters: [],
                 defender_characters: [],
                 attacker_ability_bonus: 0,
@@ -882,9 +1071,9 @@ function loc_regression() {
             pending_choice = {
                 kind: "raid",
                 stage: "defenders",
-                attacker_ship_index: 0,
-                defender_ship_index: 0,
-                attacker_characters: [0],
+                attacker_ship_id: game_state.players[0].board.ships[0].instance_id,
+                defender_ship_id: game_state.players[1].board.ships[0].instance_id,
+                attacker_characters: [game_state.players[0].board.characters[0].instance_id],
                 defender_characters: [],
                 attacker_ability_bonus: 0,
                 defender_ability_bonus: 0
@@ -896,6 +1085,71 @@ function loc_regression() {
                 && array_length(game_state.players[1].board.ships) == 0,
                 "Raid contributors exhaust and affect the final total",
                 "The contributor remained ready or failed to break the tie."
+            );
+
+            _reset();
+            var _shifted_noncontributor = make_card_instance(
+                get_card_definition("loc.private_military"), 0, "board"
+            );
+            var _shifted_contributor = make_card_instance(
+                get_card_definition("loc.gf_marine"), 0, "board"
+            );
+            array_push(
+                game_state.players[0].board.characters,
+                _shifted_noncontributor
+            );
+            array_push(
+                game_state.players[0].board.characters,
+                _shifted_contributor
+            );
+            var _shifted_contributor_id = _shifted_contributor.instance_id;
+            var _shifted_expected_strength = get_card_stat(
+                _shifted_contributor, "raid_character"
+            );
+            array_delete(game_state.players[0].board.characters, 0, 1);
+            var _shifted_actual_strength = raid_exhaust_characters(
+                game_state.players[0], [_shifted_contributor_id]
+            );
+            _assert(
+                _shifted_actual_strength == _shifted_expected_strength
+                && !_shifted_contributor.ready,
+                "Raid contributors survive board-index shifts by instance ID",
+                "Removing an earlier Character changed the committed contributor."
+            );
+
+            _reset();
+            var _removed_vehicle_attacker = make_card_instance(
+                get_card_definition("loc.light_shuttle"), 0, "board"
+            );
+            var _removed_vehicle_defender = make_card_instance(
+                get_card_definition("loc.light_shuttle"), 1, "board"
+            );
+            array_push(
+                game_state.players[0].board.ships,
+                _removed_vehicle_attacker
+            );
+            array_push(
+                game_state.players[1].board.ships,
+                _removed_vehicle_defender
+            );
+            pending_choice = {
+                kind: "raid",
+                stage: "defenders",
+                attacker_ship_id: _removed_vehicle_attacker.instance_id,
+                defender_ship_id: _removed_vehicle_defender.instance_id,
+                attacker_characters: [],
+                defender_characters: [],
+                attacker_ability_bonus: 0,
+                defender_ability_bonus: 0
+            };
+            array_delete(game_state.players[1].board.ships, 0, 1);
+            var _removed_vehicle_raid_ended = !raid_validate_participants(
+                pending_choice
+            );
+            _assert(
+                _removed_vehicle_raid_ended && is_undefined(pending_choice),
+                "Raid ends when a participating Vehicle leaves play",
+                "The Raid retained a missing attacking or defending Vehicle."
             );
 
             _reset();
@@ -941,9 +1195,9 @@ function loc_regression() {
             pending_choice = {
                 kind: "raid",
                 stage: "defenders",
-                attacker_ship_index: 0,
-                defender_ship_index: 0,
-                attacker_characters: [0],
+                attacker_ship_id: game_state.players[0].board.ships[0].instance_id,
+                defender_ship_id: game_state.players[1].board.ships[0].instance_id,
+                attacker_characters: [game_state.players[0].board.characters[0].instance_id],
                 defender_characters: [],
                 attacker_ability_bonus: 0,
                 defender_ability_bonus: 0
@@ -982,8 +1236,8 @@ function loc_regression() {
             pending_choice = {
                 kind: "raid",
                 stage: "defenders",
-                attacker_ship_index: 0,
-                defender_ship_index: 0,
+                attacker_ship_id: game_state.players[0].board.ships[0].instance_id,
+                defender_ship_id: game_state.players[1].board.ships[0].instance_id,
                 attacker_characters: [],
                 defender_characters: [],
                 attacker_ability_bonus: 0,
@@ -1024,8 +1278,8 @@ function loc_regression() {
             pending_choice = {
                 kind: "raid",
                 stage: "defenders",
-                attacker_ship_index: 0,
-                defender_ship_index: 0,
+                attacker_ship_id: game_state.players[0].board.ships[0].instance_id,
+                defender_ship_id: game_state.players[1].board.ships[0].instance_id,
                 attacker_characters: [],
                 defender_characters: [],
                 attacker_ability_bonus: 10,
@@ -1067,6 +1321,18 @@ function loc_regression() {
                 -1,
                 "shop"
             );
+            for (var _queen_auto_row_setup = 0;
+                 _queen_auto_row_setup < 4;
+                 _queen_auto_row_setup++) {
+                var _queen_auto_row_card = make_card_instance(
+                    get_card_definition("loc.gf_soldier"),
+                    -1,
+                    "shop"
+                );
+                _queen_auto_row_card.ui_shop_slot = _queen_auto_row_setup;
+                array_push(game_state.shop_row, _queen_auto_row_card);
+            }
+            _queen_auto_card.ui_shop_slot = 4;
             array_push(game_state.shop_row, _queen_auto_card);
             for (var _queen_return_deck_index = 0;
                  _queen_return_deck_index < 4;
@@ -1102,7 +1368,6 @@ function loc_regression() {
                 && pending_choice.player_index == 1;
             choose_special_containment_ship(-1);
             var _queen_auto_in_deck = false;
-            var _queen_auto_in_row = false;
             for (var _queen_auto_deck_index = 0;
                  _queen_auto_deck_index < array_length(game_state.shop_deck);
                  _queen_auto_deck_index++) {
@@ -1111,24 +1376,12 @@ function loc_regression() {
                     _queen_auto_in_deck = true;
                 }
             }
-            for (var _queen_auto_row_index = 0;
-                 _queen_auto_row_index < array_length(game_state.shop_row);
-                 _queen_auto_row_index++) {
-                if (game_state.shop_row[_queen_auto_row_index].instance_id
-                    == _queen_auto_card.instance_id) {
-                    _queen_auto_in_row = true;
-                }
-            }
             _assert(
                 _queen_reached_second
                 && is_undefined(special_containment_sequence)
                 && array_length(game_state.shop_row) == 5
-                && (_queen_auto_in_deck || _queen_auto_in_row)
-                && (!_queen_auto_in_row
-                    ? is_undefined(pending_choice)
-                    : (!is_undefined(pending_choice)
-                        && pending_choice.kind == "queen_event"
-                        && pending_choice.stage == "revealed")),
+                && _queen_auto_in_deck
+                && is_undefined(pending_choice),
                 "Queen containment completes across both players",
                 "The second player or automatic Queen return was skipped."
             );
@@ -1354,6 +1607,28 @@ function loc_regression() {
                     create_metroid_for_stage(1)
                 );
             }
+
+            var _gf_starter_config = get_identity_starter_config(
+                "GF", "loc.gf_marine"
+            );
+            var _gf_tyr_count = 0;
+            var _gf_sloop_count = 0;
+            for (var _gf_starter_index = 0;
+                 _gf_starter_index
+                    < array_length(_gf_starter_config.deck_ids);
+                 _gf_starter_index++) {
+                _gf_tyr_count += _gf_starter_config.deck_ids[_gf_starter_index]
+                    == "loc.g_f_s_tyr" ? 1 : 0;
+                _gf_sloop_count += _gf_starter_config.deck_ids[_gf_starter_index]
+                    == "starter.sloop" ? 1 : 0;
+            }
+            _assert(
+                array_length(_gf_starter_config.deck_ids) == 10
+                && _gf_tyr_count == 2
+                && _gf_sloop_count == 0,
+                "GF starter contains two G.F.S. Tyr and no Sloop",
+                "The defensive fleet starter composition was not preserved."
+            );
             var _mercy_started = check_alternate_end_conditions();
             var _mercy_waited = _mercy_started
                 && game_state.final_round_active
@@ -1415,6 +1690,8 @@ function loc_regression() {
         pending_choice = _saved_pending_choice;
         containment_resolution = _saved_containment;
         special_containment_sequence = _saved_special;
+        chozo_ghosts_end_turn = _saved_chozo_ghosts_end_turn;
+        gf_soldier_breach_sequence = _saved_gf_soldier_breach_sequence;
         next_card_instance_id = _saved_next_card_id;
         next_metroid_instance_id = _saved_next_metroid_id;
         faction_starters_enabled = _saved_faction_starters_enabled;
@@ -1444,6 +1721,7 @@ function loc_regression() {
             failed: _assert_context.failed,
             path: _path
         };
+        global.loc_regression_progress = undefined;
         show_debug_message(
             "[REGRESSION] " + string(_assert_context.passed) + " passed, "
             + string(_assert_context.failed) + " failed. "

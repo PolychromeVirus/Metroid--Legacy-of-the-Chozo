@@ -8,6 +8,7 @@ function loc_step() {
     && !is_undefined(raid_suspended_choice)) {
         pending_choice = raid_suspended_choice;
         raid_suspended_choice = undefined;
+        raid_validate_participants(pending_choice);
     }
 
     // Keep the application surface at one GUI pixel per window client pixel.
@@ -408,11 +409,6 @@ function loc_step() {
                 + string(_balance_sync_error)
             );
         }
-    }
-
-    if (!chat_input_active && keyboard_check_pressed(ord("R"))) {
-        room_restart();
-        exit;
     }
 
     // Cavern Omegas read as detected underground activity. Ease the sensor display

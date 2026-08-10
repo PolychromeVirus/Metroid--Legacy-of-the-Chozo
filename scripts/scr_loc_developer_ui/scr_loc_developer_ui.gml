@@ -8,7 +8,7 @@ function loc_developer_ui() {
     settings_opponent_ui_color_index = 5;
     settings_saved_player_name = "Player 1";
     settings_saved_player_two_name = "Player 2";
-    settings_debug_mode = true;
+    settings_debug_mode = false;
     settings_context_help = true;
     settings_first_game_guidance = true;
     settings_menu_active = false;
@@ -43,7 +43,7 @@ function loc_developer_ui() {
         settings_opponent_ui_color_index = clamp(floor(ini_read_real(
             "ui", "opponent_color_index", 5
         )), 0, array_length(settings_ui_color_names) - 1);
-        settings_debug_mode = ini_read_real("debug", "enabled", 1) >= 1;
+        settings_debug_mode = ini_read_real("debug", "enabled", 0) >= 1;
         settings_context_help = ini_read_real("help", "contextual", 1) >= 1;
         settings_first_game_guidance = ini_read_real(
             "help", "first_game", 1
@@ -294,6 +294,7 @@ function loc_developer_ui() {
     guidance_final_round_observed = false;
 
     guidance_is_local_player = function(_player_index) {
+        if (game_state.game_mode == "regression") return false;
         if (_player_index < 0 || _player_index >= array_length(game_state.players)) {
             return false;
         }
@@ -319,6 +320,7 @@ function loc_developer_ui() {
         || title_menu_active
         || game_state.game_mode == ""
         || game_state.game_mode == "batch"
+        || game_state.game_mode == "regression"
         || game_state.game_mode == "ai_watch"
         || variable_struct_exists(guidance_queued, _id)) {
             return false;
@@ -339,6 +341,7 @@ function loc_developer_ui() {
     };
 
     queue_blocking_notice = function(_title, _body) {
+        if (game_state.game_mode == "regression") return false;
         array_push(guidance_queue, {
             id: "",
             title: _title,

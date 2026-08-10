@@ -1,10 +1,54 @@
 function loc_raids() {
+    gf_soldier_breach_sequence = undefined;
     raid_array_contains = function(_array, _value) {
         for (var _index = 0; _index < array_length(_array); _index++) {
             if (_array[_index] == _value) {
                 return true;
             }
         }
+        return false;
+    };
+
+    raid_find_instance_index = function(_cards, _instance_id) {
+        for (var _card_index = 0;
+             _card_index < array_length(_cards);
+             _card_index++) {
+            if (_cards[_card_index].instance_id == _instance_id) return _card_index;
+        }
+        return -1;
+    };
+
+    raid_get_ship = function(_player, _instance_id) {
+        var _ship_index = raid_find_instance_index(
+            _player.board.ships, _instance_id
+        );
+        return _ship_index >= 0 ? _player.board.ships[_ship_index] : undefined;
+    };
+
+    raid_validate_participants = function(_raid) {
+        if (is_undefined(_raid) || _raid.kind != "raid") return true;
+        var _attacker_exists = !is_undefined(raid_get_ship(
+            game_state.players[game_state.active_player],
+            _raid.attacker_ship_id
+        ));
+        var _defender_exists = _raid.defender_ship_id < 0
+            || !is_undefined(raid_get_ship(
+                game_state.players[1 - game_state.active_player],
+                _raid.defender_ship_id
+            ));
+        if (_attacker_exists && _defender_exists) return true;
+        var _missing_side = !_attacker_exists
+            ? "attacking" : "defending";
+        array_push(
+            game_state.event_log,
+            "The raid ended because its " + _missing_side
+                + " Vehicle left play."
+        );
+        if (pending_choice == _raid) pending_choice = undefined;
+        if (raid_suspended_choice == _raid) raid_suspended_choice = undefined;
+        game_state.priority_player = game_state.active_player;
+        ui_selected_kind = "";
+        ui_selected_index = -1;
         return false;
     };
 
@@ -31,15 +75,16 @@ function loc_raids() {
         var _selected = _defending
             ? pending_choice.defender_characters
             : pending_choice.attacker_characters;
+        var _character_id = _characters[_character_index].instance_id;
         for (var _selected_index = 0;
              _selected_index < array_length(_selected);
              _selected_index++) {
-            if (_selected[_selected_index] == _character_index) {
+            if (_selected[_selected_index] == _character_id) {
                 array_delete(_selected, _selected_index, 1);
                 return true;
             }
         }
-        array_push(_selected, _character_index);
+        array_push(_selected, _character_id);
         return true;
     };
 
@@ -84,8 +129,10 @@ function loc_raids() {
         pending_choice = {
             kind: "raid",
             stage: "target",
-            attacker_ship_index: _attacker_index,
-            defender_ship_index: -1,
+            attacker_ship_id: _attacker_player.board.ships[
+                _attacker_index
+            ].instance_id,
+            defender_ship_id: -1,
             attacker_characters: [],
             defender_characters: [],
             attacker_ability_bonus: 0,
@@ -124,9 +171,17 @@ function loc_raids() {
             return false;
         }
 
-        var _attacker = _attacker_player.board.ships[
-            pending_choice.attacker_ship_index
-        ];
+        var _attacker_index = raid_find_instance_index(
+            _attacker_player.board.ships,
+            pending_choice.attacker_ship_id
+        );
+        if (_attacker_index < 0) {
+            array_push(game_state.event_log,
+                "The raid ended because its attacking Vehicle left play.");
+            pending_choice = undefined;
+            return false;
+        }
+        var _attacker = _attacker_player.board.ships[_attacker_index];
         _attacker_player.command_points -= pending_choice.raid_cost;
         _attacker_player.telemetry.raids_started += 1;
         _attacker.ready = false;
@@ -134,7 +189,7 @@ function loc_raids() {
             var _corrupted_attacker_name = _attacker.definition.name;
             raid_discard_ship(
                 _attacker_player,
-                pending_choice.attacker_ship_index,
+                _attacker_index,
                 undefined
             );
             pending_choice = undefined;
@@ -146,7 +201,9 @@ function loc_raids() {
             );
             return true;
         }
-        pending_choice.defender_ship_index = _defender_ship_index;
+        pending_choice.defender_ship_id = _defender_player.board.ships[
+            _defender_ship_index
+        ].instance_id;
         pending_choice.stage = "attackers";
         pending_choice.interaction_mode = "abilities";
         pending_choice.prompt =
@@ -168,6 +225,7 @@ function loc_raids() {
         || pending_choice.stage != "attackers") {
             return false;
         }
+        if (!raid_validate_participants(pending_choice)) return false;
         pending_choice.stage = "defenders";
         pending_choice.interaction_mode = "abilities";
         pending_choice.ability_source_kind = "";
@@ -233,7 +291,25 @@ function loc_raids() {
              _raid_ability_index < array_length(_abilities);
              _raid_ability_index++) {
             var _raid_ability = _abilities[_raid_ability_index];
-            if ((!_raid_ability.cost_exhaust || _card.ready)
+            var _raid_context_legal = true;
+            if (_raid_ability.effect_kind == "raid_defense_1") {
+                _raid_context_legal = !is_undefined(pending_choice)
+                    && pending_choice.kind == "raid"
+                    && pending_choice.stage == "defenders";
+            } else if (_raid_ability.effect_kind == "tyr_raid_support") {
+                var _tyr_raid_target = !is_undefined(pending_choice)
+                    && pending_choice.kind == "raid"
+                    && pending_choice.stage == "defenders"
+                    ? raid_get_ship(
+                        game_state.players[_card.controller],
+                        pending_choice.defender_ship_id
+                    )
+                    : undefined;
+                _raid_context_legal = !is_undefined(_tyr_raid_target)
+                    && _tyr_raid_target.instance_id != _card.instance_id;
+            }
+            if (_raid_context_legal
+            && (!_raid_ability.cost_exhaust || _card.ready)
             && game_state.players[_card.controller].command_points
                 >= _raid_ability.cost_cp) {
                 array_push(_legal_indices, _raid_ability_index);
@@ -338,6 +414,7 @@ function loc_raids() {
             _raid.ability_source_index,
             _raid_ability_index
         );
+        if (pending_choice == _raid) raid_validate_participants(_raid);
         if (pending_choice == _raid) raid_suspended_choice = undefined;
         _raid.ability_source_kind = "";
         _raid.ability_source_index = -1;
@@ -345,26 +422,75 @@ function loc_raids() {
         return _resolved;
     };
 
-    raid_exhaust_characters = function(_player, _selected) {
+    raid_character_contribution = function(_character, _defending_ship) {
+        var _contribution = get_card_stat(_character, "raid_character");
+        if (!is_undefined(_defending_ship)
+        && _defending_ship.definition_id == "loc.g_f_s_olympus"
+        && card_has_faction(_character, "GF")) {
+            _contribution += 1;
+        }
+        return _contribution;
+    };
+
+    raid_tyr_support_potential = function(_player, _defending_ship) {
+        if (is_undefined(_defending_ship)) return 0;
+        var _support_value = card_has_faction(_defending_ship, "GF") ? 2 : 1;
+        var _support_total = 0;
+        for (var _ship_index = 0;
+             _ship_index < array_length(_player.board.ships);
+             _ship_index++) {
+            var _ship = _player.board.ships[_ship_index];
+            if (_ship.definition_id == "loc.g_f_s_tyr"
+            && _ship.instance_id != _defending_ship.instance_id
+            && _ship.ready) {
+                _support_total += _support_value;
+            }
+        }
+        return _support_total;
+    };
+
+    raid_exhaust_characters = function(_player, _selected, _defending_ship) {
         var _strength = 0;
+        var _olympus_bonus = 0;
         for (var _selection_index = 0;
              _selection_index < array_length(_selected);
              _selection_index++) {
-            var _character_index = _selected[_selection_index];
-            if (_character_index >= 0
-            && _character_index < array_length(_player.board.characters)) {
+            var _character_index = raid_find_instance_index(
+                _player.board.characters,
+                _selected[_selection_index]
+            );
+            if (_character_index >= 0) {
                 var _character = _player.board.characters[_character_index];
                 if (_character.ready) {
-                    _strength += get_card_stat(_character, "raid_character");
+                    var _base_contribution = get_card_stat(
+                        _character, "raid_character"
+                    );
+                    var _character_contribution = raid_character_contribution(
+                        _character, _defending_ship
+                    );
+                    _strength += _character_contribution;
+                    _olympus_bonus += _character_contribution
+                        - _base_contribution;
                     _character.ready = false;
                 }
             }
         }
 
+        if (_olympus_bonus > 0) {
+            array_push(
+                game_state.event_log,
+                "G.F.S. Olympus added +" + string(_olympus_bonus)
+                    + " Strength from Galactic Federation defenders."
+            );
+        }
+
         for (var _board_index = array_length(_player.board.characters) - 1;
              _board_index >= 0;
              _board_index--) {
-            if (raid_array_contains(_selected, _board_index)
+            if (raid_array_contains(
+                _selected,
+                _player.board.characters[_board_index].instance_id
+            )
             && card_discards_from_phazon(
                 _player.board.characters[_board_index]
             )) {
@@ -424,6 +550,151 @@ function loc_raids() {
         return _ship;
     };
 
+    find_lowest_stage_breaching_metroid = function(_player) {
+        for (var _hunter_index = 0;
+             _hunter_index < array_length(_player.lab);
+             _hunter_index++) {
+            if (_player.lab[_hunter_index].definition_id == "metroid.hunter") {
+                return _hunter_index;
+            }
+        }
+        var _lowest_index = -1;
+        var _lowest_stage = 100000;
+        for (var _metroid_index = 0;
+             _metroid_index < array_length(_player.lab);
+             _metroid_index++) {
+            var _stage = _player.lab[_metroid_index].definition.stage;
+            if (is_real(_stage) && _stage < _lowest_stage) {
+                _lowest_stage = _stage;
+                _lowest_index = _metroid_index;
+            }
+        }
+        return _lowest_index;
+    };
+
+    continue_gf_soldier_breaches = function() {
+        if (is_undefined(gf_soldier_breach_sequence)) return false;
+        var _sequence = gf_soldier_breach_sequence;
+        while (_sequence.index < array_length(_sequence.entries)
+        && (_sequence.entries[_sequence.index].remaining <= 0
+            || array_length(game_state.players[
+                _sequence.entries[_sequence.index].player_index
+            ].lab) <= 0)) {
+            _sequence.index += 1;
+        }
+        if (_sequence.index >= array_length(_sequence.entries)) {
+            gf_soldier_breach_sequence = undefined;
+            pending_choice = undefined;
+            game_state.priority_player = game_state.active_player;
+            ui_selected_kind = "";
+            ui_selected_index = -1;
+            return true;
+        }
+        var _entry = _sequence.entries[_sequence.index];
+        var _player = game_state.players[_entry.player_index];
+        var _breach_index = find_lowest_stage_breaching_metroid(_player);
+        if (_breach_index < 0) {
+            _entry.remaining = 0;
+            return continue_gf_soldier_breaches();
+        }
+        _entry.remaining -= 1;
+        if (!resolve_metroid_breach(_player, _breach_index, true)) {
+            return continue_gf_soldier_breaches();
+        }
+        if (array_length(_player.board.characters) <= 0) {
+            release_breach_presentation(presentation_last_breach_instance_id);
+            return continue_gf_soldier_breaches();
+        }
+        game_state.priority_player = _entry.player_index;
+        pending_choice = {
+            kind: "breach_character",
+            player_index: _entry.player_index,
+            breach_instance_id: presentation_last_breach_instance_id,
+            gf_soldier_breach: true,
+            prompt: _player.name
+                + ": choose a Character to discard for GF Soldier's breach."
+        };
+        return true;
+    };
+
+    resolve_gf_soldier_breach_character = function(_character_index) {
+        if (is_undefined(pending_choice)
+        || pending_choice.kind != "breach_character"
+        || !variable_struct_exists(pending_choice, "gf_soldier_breach")
+        || !pending_choice.gf_soldier_breach
+        || is_undefined(gf_soldier_breach_sequence)) return false;
+        var _player = game_state.players[pending_choice.player_index];
+        if (_character_index < 0
+        || _character_index >= array_length(_player.board.characters)) {
+            return false;
+        }
+        var _character = _player.board.characters[_character_index];
+        array_delete(_player.board.characters, _character_index, 1);
+        clear_card_board_state(_character);
+        _character.zone = "discard";
+        array_push(_player.discard, _character);
+        array_push(
+            game_state.event_log,
+            _player.name + " discarded " + _character.definition.name
+                + " for GF Soldier's forced breach."
+        );
+        release_breach_presentation(pending_choice.breach_instance_id);
+        pending_choice = undefined;
+        return continue_gf_soldier_breaches();
+    };
+
+    trigger_gf_soldier_ship_destructions = function(_destroyed_players) {
+        var _entries = [];
+        for (var _destroyed_index = 0;
+             _destroyed_index < array_length(_destroyed_players);
+             _destroyed_index++) {
+            var _owner_index = _destroyed_players[_destroyed_index];
+            var _owner = game_state.players[_owner_index];
+            var _opponent_index = 1 - _owner_index;
+            var _opponent = game_state.players[_opponent_index];
+            var _breach_count = 0;
+            for (var _soldier_index = array_length(_owner.board.characters) - 1;
+                 _soldier_index >= 0;
+                 _soldier_index--) {
+                var _soldier = _owner.board.characters[_soldier_index];
+                if (_soldier.definition_id != "loc.gf_soldier"
+                || !_soldier.ready) continue;
+                _soldier.ready = false;
+                _breach_count += 1;
+                array_push(
+                    game_state.event_log,
+                    "GF Soldier exhausted after its controller's Ship was destroyed in a raid and forced "
+                        + _opponent.name + "'s lowest-stage Metroid to breach."
+                );
+                if (card_discards_from_phazon(_soldier)) {
+                    array_delete(_owner.board.characters, _soldier_index, 1);
+                    clear_card_board_state(_soldier);
+                    _soldier.zone = "discard";
+                    array_push(_owner.discard, _soldier);
+                    array_push(
+                        game_state.event_log,
+                        "GF Soldier was discarded after exhausting while corrupted."
+                    );
+                }
+            }
+            if (_breach_count > 0 && array_length(_opponent.lab) > 0) {
+                array_push(_entries, {
+                    player_index: _opponent_index,
+                    remaining: _breach_count
+                });
+            }
+        }
+        pending_choice = undefined;
+        if (array_length(_entries) <= 0) {
+            game_state.priority_player = game_state.active_player;
+            ui_selected_kind = "";
+            ui_selected_index = -1;
+            return true;
+        }
+        gf_soldier_breach_sequence = {entries: _entries, index: 0};
+        return continue_gf_soldier_breaches();
+    };
+
     finish_attacker_raid_win = function(_cargo_index) {
         if (is_undefined(pending_choice)
         || pending_choice.kind != "raid_cargo") {
@@ -438,12 +709,25 @@ function loc_raids() {
         var _loser_player = _choice.winner_is_attacker
             ? _defender_player
             : _attacker_player;
-        var _winner_ship_index = _choice.winner_is_attacker
-            ? _choice.attacker_ship_index
-            : _choice.defender_ship_index;
-        var _loser_ship_index = _choice.winner_is_attacker
-            ? _choice.defender_ship_index
-            : _choice.attacker_ship_index;
+        var _winner_ship_id = _choice.winner_is_attacker
+            ? _choice.attacker_ship_id
+            : _choice.defender_ship_id;
+        var _loser_ship_id = _choice.winner_is_attacker
+            ? _choice.defender_ship_id
+            : _choice.attacker_ship_id;
+        var _winner_ship_index = raid_find_instance_index(
+            _winner_player.board.ships, _winner_ship_id
+        );
+        var _loser_ship_index = raid_find_instance_index(
+            _loser_player.board.ships, _loser_ship_id
+        );
+        if (_winner_ship_index < 0 || _loser_ship_index < 0) {
+            array_push(game_state.event_log,
+                "The raid ended because a participating Vehicle left play.");
+            pending_choice = undefined;
+            game_state.priority_player = game_state.active_player;
+            return false;
+        }
         var _winner = _winner_player.board.ships[_winner_ship_index];
         var _loser = _loser_player.board.ships[_loser_ship_index];
         if (_cargo_index < 0
@@ -480,7 +764,12 @@ function loc_raids() {
         game_state.priority_player = game_state.active_player;
         ui_selected_kind = "";
         ui_selected_index = -1;
-        return true;
+        var _destroyed_player_index = _choice.winner_is_attacker
+            ? 1 - game_state.active_player
+            : game_state.active_player;
+        return trigger_gf_soldier_ship_destructions([
+            _destroyed_player_index
+        ]);
     };
 
     resolve_raid = function() {
@@ -493,12 +782,23 @@ function loc_raids() {
         var _raid = pending_choice;
         var _attacker_player = game_state.players[game_state.active_player];
         var _defender_player = game_state.players[1 - game_state.active_player];
-        var _attacker = _attacker_player.board.ships[
-            _raid.attacker_ship_index
-        ];
-        var _defender = _defender_player.board.ships[
-            _raid.defender_ship_index
-        ];
+        var _attacker_ship_index = raid_find_instance_index(
+            _attacker_player.board.ships, _raid.attacker_ship_id
+        );
+        var _defender_ship_index = raid_find_instance_index(
+            _defender_player.board.ships, _raid.defender_ship_id
+        );
+        if (_attacker_ship_index < 0 || _defender_ship_index < 0) {
+            array_push(game_state.event_log,
+                "The raid ended because a participating Vehicle left play.");
+            pending_choice = undefined;
+            game_state.priority_player = game_state.active_player;
+            ui_selected_kind = "";
+            ui_selected_index = -1;
+            return false;
+        }
+        var _attacker = _attacker_player.board.ships[_attacker_ship_index];
+        var _defender = _defender_player.board.ships[_defender_ship_index];
         var _attacker_total = get_card_stat(_attacker, "raid_attacker_ship")
             + raid_exhaust_characters(
                 _attacker_player,
@@ -508,10 +808,12 @@ function loc_raids() {
         var _defender_total = get_card_stat(_defender, "raid_defender_ship")
             + raid_exhaust_characters(
                 _defender_player,
-                _raid.defender_characters
+                _raid.defender_characters,
+                _defender
             )
             + _raid.defender_ability_bonus;
 
+        var _destroyed_ship_players = [];
         if (_attacker_total > _defender_total) {
             _attacker_player.telemetry.raids_won += 1;
             _defender_player.telemetry.raids_lost += 1;
@@ -521,8 +823,8 @@ function loc_raids() {
             && array_length(_defender.cargo) > _raid_capacity_remaining) {
                 pending_choice = {
                     kind: "raid_cargo",
-                    attacker_ship_index: _raid.attacker_ship_index,
-                    defender_ship_index: _raid.defender_ship_index,
+                    attacker_ship_id: _raid.attacker_ship_id,
+                    defender_ship_id: _raid.defender_ship_id,
                     attacker_total: _attacker_total,
                     defender_total: _defender_total,
                     winner_is_attacker: true,
@@ -533,9 +835,10 @@ function loc_raids() {
             }
             var _lost_defender = raid_discard_ship(
                 _defender_player,
-                _raid.defender_ship_index,
+                _defender_ship_index,
                 _attacker
             );
+            array_push(_destroyed_ship_players, 1 - game_state.active_player);
             array_push(
                 game_state.event_log,
                 "Raid " + string(_attacker_total) + "-"
@@ -558,8 +861,8 @@ function loc_raids() {
             && array_length(_attacker.cargo) > _defender_capacity_remaining) {
                 pending_choice = {
                     kind: "raid_cargo",
-                    attacker_ship_index: _raid.attacker_ship_index,
-                    defender_ship_index: _raid.defender_ship_index,
+                    attacker_ship_id: _raid.attacker_ship_id,
+                    defender_ship_id: _raid.defender_ship_id,
                     attacker_total: _attacker_total,
                     defender_total: _defender_total,
                     winner_is_attacker: false,
@@ -570,9 +873,10 @@ function loc_raids() {
             }
             var _lost_attacker = raid_discard_ship(
                 _attacker_player,
-                _raid.attacker_ship_index,
+                _attacker_ship_index,
                 _defender
             );
+            array_push(_destroyed_ship_players, game_state.active_player);
             array_push(
                 game_state.event_log,
                 "Raid " + string(_attacker_total) + "-"
@@ -586,14 +890,16 @@ function loc_raids() {
             var _tied_defender_name = _defender.definition.name;
             raid_discard_ship(
                 _attacker_player,
-                _raid.attacker_ship_index,
+                _attacker_ship_index,
                 undefined
             );
             raid_discard_ship(
                 _defender_player,
-                _raid.defender_ship_index,
+                _defender_ship_index,
                 undefined
             );
+            array_push(_destroyed_ship_players, game_state.active_player);
+            array_push(_destroyed_ship_players, 1 - game_state.active_player);
             array_push(
                 game_state.event_log,
                 "Raid tied " + string(_attacker_total) + "-"
@@ -607,6 +913,11 @@ function loc_raids() {
         game_state.priority_player = game_state.active_player;
         ui_selected_kind = "";
         ui_selected_index = -1;
+        if (array_length(_destroyed_ship_players) > 0) {
+            return trigger_gf_soldier_ship_destructions(
+                _destroyed_ship_players
+            );
+        }
         return true;
     };
 
@@ -1045,9 +1356,31 @@ function loc_raids() {
     resolve_chozo_ghosts_target = function(_card) {
         if (is_undefined(pending_choice)
         || pending_choice.kind != "chozo_ghosts_target"
-        || is_undefined(_card)
-        || _card.definition.type != "character"
-        || _card.controller != pending_choice.target_player_index) return false;
+        || pending_choice.target_player_index < 0
+        || pending_choice.target_player_index
+            >= array_length(game_state.players)) return false;
+        var _target_characters = game_state.players[
+            pending_choice.target_player_index
+        ].board.characters;
+        if (array_length(_target_characters) <= 0) {
+            array_push(
+                game_state.event_log,
+                "Chozo Ghosts had no remaining opposing Character to receive its Phazon."
+            );
+            chozo_ghosts_end_turn.index += 1;
+            pending_choice = undefined;
+            return continue_chozo_ghosts_end_turn();
+        }
+        if (is_undefined(_card)) return false;
+        var _target_index = raid_find_instance_index(
+            _target_characters,
+            _card.instance_id
+        );
+        if (_target_index < 0) return false;
+        // Presence on the chosen player's Character board is authoritative. A
+        // stale controller field must not make AI repeatedly reject the same
+        // otherwise legal target.
+        _card = _target_characters[_target_index];
         var _tokens = pending_choice.tokens;
         _card.phazon_tokens += _tokens;
         array_push(

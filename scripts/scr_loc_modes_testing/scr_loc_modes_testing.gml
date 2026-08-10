@@ -67,7 +67,7 @@ function loc_modes_testing() {
                     "starter.researcher",
                     "starter.private_military",
                     "starter.private_military",
-                    "starter.sloop"
+                    "loc.g_f_s_tyr"
                 ]
             };
             case "SP": return {
@@ -800,14 +800,14 @@ function loc_modes_testing() {
                 }
                 pending_choice = {
                     kind: "raid",
-                    stage: "contributors",
-                    attacker_ship_index: 0,
-                    defender_ship_index: 0,
+                    stage: "attackers",
+                    attacker_ship_id: _player.board.ships[0].instance_id,
+                    defender_ship_id: _raid_defender.board.ships[0].instance_id,
                     attacker_characters: [],
                     defender_characters: [],
                     attacker_ability_bonus: 0,
                     defender_ability_bonus: 0,
-                    interaction_mode: "contributors",
+                    interaction_mode: "abilities",
                     ability_source_kind: "",
                     ability_source_index: -1,
                     ability_index: -1,

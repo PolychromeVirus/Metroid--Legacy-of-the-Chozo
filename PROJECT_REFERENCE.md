@@ -15,13 +15,16 @@ AI behavior, networking, and balance instrumentation.
 Use this source priority when files disagree:
 
 1. Settled clarifications recorded in this document.
-2. `boardgamefiles/chozoreference.xlsx` as the canonical card database for
+2. `chozoreference.xlsx` as the canonical card database for
    card names, set membership, quantities, costs, values, faction/type tags,
    and effect text.
-3. `boardgamefiles/Legacy of Chozo rules-2.pdf` for core rules not superseded
+3. `datafiles/generated/*.json` as the runtime cache exported from that workbook;
+   regenerate it after spreadsheet edits rather than treating it as independent
+   design authority.
+4. `boardgamefiles/Legacy of Chozo rules-2.pdf` for core rules not superseded
    by this reference.
-4. Rendered cards and boards for presentation and icon interpretation.
-5. `.xcf`, `.cmp`, and other work-in-progress files as design sources, not
+5. Rendered cards and boards for presentation and icon interpretation.
+6. `.xcf`, `.cmp`, and other work-in-progress files as design sources, not
    rules authority.
 
 Items under **Remaining design work** are planned content rather than settled rules.
@@ -110,19 +113,13 @@ Effect markup used by the card generator:
 
 1. Separate the Metroid cards by stage in this order: Larva, Alpha, Gamma, Zeta, Omega.
 2. Place four Larvae into the four SR388 slots.
-3. For the current first pass, each player takes a copy of the 10-card Neutral starter, shuffles it, and draws five cards.
+3. Each player resolves a named leader identity, builds that identity's 10-card starter deck, shuffles it, and draws five cards. Random resolves to one of the concrete leaders before deck construction.
 4. Shuffle every core-set card not used in the starters into the Shop deck and reveal five cards.
 5. During setup only, if Queen Metroid Awakens is revealed, put it on the bottom, continue until the Shop has five cards, then shuffle the Shop deck again.
 6. Set the Mutation Track to 0.
 7. Flip a coin to choose the first player.
 
-Only one starter deck is currently defined: a 10-card Neutral starter. Faction starters are planned for testing, with these intended identities:
-
-- Galactic Federation: economy
-- Space Pirates: raids
-- Chozo: Metroids and removal
-- Bounty Hunters: game-state manipulation
-- Phazon: corruption
+Five named leader identities are currently selectable. B.S.L. Researcher uses the neutral Mercenary starter; Adam Malkovich uses Galactic Federation; Mother Brain uses Space Pirates; and Quiet Robe and Raven Beak use distinct Thoha and Mawkin Chozo starters. These are complete runtime deck lists rather than single-card substitutions. Their current balance and opening-card cohesion remain under playtest.
 
 ## 7. Turn structure
 
@@ -254,6 +251,23 @@ A Ship without cargo is a legal raid target, although raiding it normally provid
 
 During either side's Raid priority window, hovering one of the priority player's permanents exposes its normal card-anchored context menu without requiring selection. A ready Character has an `EXHAUST: +X SECURITY` contribution button alongside any otherwise-legal activated abilities and Salvage. Abilities use their normal targets and follow-up choices; after an action finishes, play returns to the same attacker or defender Raid window. Only Lock Attackers / Resolve Raid remains in the sidebar.
 
+G.F.S. Tyr is a dedicated defending-fleet support Vehicle. While another friendly
+Vehicle is being raided, Tyr may exhaust to give it +2 Security if it is Galactic
+Federation or +1 Security otherwise. This targeting processes normal Phazon
+interaction, including Vehicles that gained Phazon from Aurora Unit 217. G.F.S.
+Olympus instead rewards a tribal defensive board: every Galactic Federation
+Character committed while Olympus is being raided contributes one additional
+Strength. Removing those Characters before resolution removes their contribution.
+Whenever a Ship is destroyed by a Raid, each ready GF Soldier controlled by that
+Ship's owner exhausts and forces the opponent's lowest-stage Metroid to breach.
+This applies whether the destroyed Ship attacked, defended, or was destroyed in
+a tie. A Soldier already exhausted during the Raid cannot trigger; corrupted
+Soldiers still force their paid breach before being discarded for exhausting at
+three Phazon. Hunters retain normal breach priority; otherwise the lowest numeric
+Metroid stage is chosen.
+
+Raid participants are tracked by immutable card instance IDs rather than board-array positions. Removing or inserting unrelated cards cannot change which Characters contribute or which Vehicles are fighting. A contributor that leaves play stops contributing. If either participating Vehicle leaves play during an ability sequence, the Raid ends immediately when that sequence completes and the event log identifies the missing side.
+
 ## 11. SR388 and Metroid evolution
 
 SR388 normally has four numbered surface slots. Empty slots are filled with Larvae at end of turn.
@@ -348,16 +362,16 @@ Queen Metroid Awakens behaves as a game-state event rather than a normal purchas
 
 All counts below come from the card-count field in `chozoreference.xlsx`; duplicate copies are intentional parts of their respective sets.
 
-- Core set (`LOC`): 40 unique non-Metroid designs, 105 printed copies
-  - 19 Characters
-  - 12 Ships
+- Core set (`LOC`): 47 unique non-Metroid designs, 124 printed copies
+  - 21 Characters
+  - 13 Ships
   - 5 Locations
-  - 4 Events
-- Phazon set (`LOP`): 9 populated designs, 22 printed copies
+  - 8 Events
+- Phazon set (`LOP`): 10 populated designs, 24 printed copies
   - 6 Characters
   - 2 Ships
-  - 1 Event
-- Starter: 8 unique designs forming a 10-card Neutral starter
+  - 2 Events
+- Starter-sheet cards provide the shared low-complexity pool used across the five runtime identity starters; each resolved identity assembles its own 10-card list, with intentional overlap between decks
 - Metroids: 5 standard stages plus the LOP Hunter Metroid
 
 ### Asset content
@@ -413,21 +427,32 @@ including attached cards, then places the complete removed total onto one chosen
 Character that player controls. If no tokens are removed, no choice is created;
 if no Character exists, the tokens remain removed with no recipient.
 
-Identity-tinted starter substitutions are implemented as an optional setup rule
-for human-vs-AI, AI-vs-AI, and batch profiles. These are focused substitutions
-inside the shared Neutral starter rather than complete faction-specific starter
-decks; fully distinct faction starter lists remain possible future content.
+Named identity starters are implemented for ordinary local, AI, network, rematch,
+and test setup. Adam, Mother Brain, Quiet Robe, Raven Beak, and B.S.L. Researcher
+each resolve to a complete 10-card runtime list. The current work is playtesting
+their balance, faction identity, opening consistency, and interaction with the
+updated LOP card pool; new starter-focused cards may be added if those games show
+structural gaps.
 
 Additional non-testing work still planned:
 
-- faction-specific starter decks;
-- a player-facing rules/reference screen and optional guided onboarding;
-- continued board, font, menu, prompt, and animation polish;
+- continued starter-deck and LOP balance testing;
+- focused timing audits for off-turn triggers, priority changes, nested choices,
+  target/source removal, and Phazon exhaustion;
+- wording and terminology polish for the implemented Help page, contextual help,
+  and first-game guidance;
+- a pregame network lobby with player seats, spectator support, and host-owned
+  match settings;
+- continued board, menu, prompt, and animation polish discovered through test games;
+- Lab danger-readout cleanup so current Hazard, available containment Strength,
+  and breach risk are easier to distinguish at a glance;
 - a later Shop presentation redesign, intentionally deferred until its visual
   identity is settled;
-- network disconnect, compatibility, and graceful-failure handling;
-- distributable build configuration and long-term decomposition of
-  `obj_bootstrap`.
+- network version compatibility, join/host failure reporting, disconnect handling,
+  and graceful failure;
+- automated end-to-end validation after player-facing behavior has stabilized;
+- low-priority distributable build configuration. The project currently targets
+  local PC development and personal playtesting rather than public distribution.
 
 ### Deterministic regression harness
 
@@ -467,7 +492,8 @@ Current interface decisions:
   replace generic interface palettes only; faction identity palettes remain
   independent. Sidebar and menu surfaces derive a restrained dark tint from the
   selected accent, calibrated so cyan retains its original blue-gray appearance
-  while every other choice receives the same color relationship. Debug-off hides
+  while every other choice receives the same color relationship. Debug mode is
+  disabled by default. Debug-off hides
   the in-match Test Tools/SIM controls and
   title-screen batch/regression entries.
 
@@ -479,8 +505,8 @@ Current interface decisions:
   can be edited and persisted without leaving the match; camera changes also
   apply immediately to the current board view.
 - A Help / Rules reference is available from both the title and Pause menus. It
-  uses a two-column layout with selectable concept sections on the left and a
-  scrollable plain-language summary on the right. Initial topics cover the game
+  uses an unlabeled two-column layout with selectable concept sections on the left
+  and a scrollable plain-language summary on the right. Initial topics cover the game
   overview, turn structure, cards and zones, CP/actions, Capture, Containment,
   Raids, Metroids, Research, and Factions. Longer secondary concepts remain in
   the summaries rather than shrinking the navigation labels.
@@ -500,6 +526,8 @@ Current interface decisions:
   `loc_settings.ini` so they do not repeat in later matches. Both Options pages
   include `RESTORE FIRST-TIME HINTS`, which clears that history and re-enables
   guidance.
+- Tutorial prompts avoid the abstract word `permanent` and explicitly name
+  Characters, Vehicles, and Locations where those card types are meant.
 - Corrupt Rundas uses its current Phazon token count as its dynamic Strength.
   Chozo Ghosts now resolves as a mandatory sequence at the end of its controller's
   own turn: its controller
@@ -570,15 +598,23 @@ Current interface decisions:
   targets allow controlled overscroll until the board is mostly outside the
   viewport, then ease into place. Keyboard presets remain `1` local board, `2`
   center systems, `3` opponent board, and `0` fit the complete table.
-- The header separates framing from control mode. `CENTER: CLOSE/FAR` selects
+- The full-width top header overlays both the board and sidebar. Its left side
+  identifies the viewed player's currently resolved starter deck rather than
+  displaying an engine title. Successful state-check labels are hidden when debug
+  mode is off, while actual load/setup errors remain visible.
+- The header separates framing from control mode. A Metroid-font `CAMERA:` label
+  precedes compact `CLOSE/FAR` and `LOCKED/UNLOCKED` buttons. Close/Far selects
   the desired preset and immediately recenters once whenever it changes.
   Close derives its zoom from the current board viewport while retaining the
   authored 1080p composition, so a larger window enlarges the relevant player
   surface instead of merely revealing more of the table.
-  `CAMERA: FREE/LOCKED` controls subsequent behavior. Free camera never follows
+  Locked/Unlocked controls subsequent behavior. Free camera never follows
   turns, raids, or other game state and stops any in-progress automatic motion
   when unlocked. Locked camera automatically follows the relevant local,
-  opponent, or cross-table interaction framing.
+  opponent, or cross-table interaction framing. Any off-turn priority window and
+  any effect capable of targeting opposing Characters temporarily uses the far
+  cross-table framing. Right-drag camera movement never cancels a pending effect;
+  explicit Cancel controls and Escape are the cancellation paths.
 - Board hit regions are converted from world coordinates to window coordinates
   after drawing and clipped to the board viewport. This keeps card selection,
   Lab drawers, contextual buttons, and raid targeting aligned under pan and
@@ -820,15 +856,11 @@ The title menu includes a fast AI-versus-AI batch configuration screen.
 - Slow AI-versus-AI mode independently assigns the same profile identities to
   both visible AI players. Identical-profile mirror matches remain possible;
   those names receive `Alpha` and `Beta` suffixes for clarity.
-- The title screen has a persistent, default-on `FACTION STARTERS` option for
-  visible AI modes. When enabled, each AI makes one identity-specific
-  replacement in its ten-card neutral starter deck; Shop counts are unchanged:
-  `NONE` replaces Military Rations with Armoured Frigate. `GF` and `SP` use
-  provisional full faction decks described below. `CZ` replaces Ship Captain
-  with a 50/50 Quiet Robe or Raven Beak, `BH`
-  replaces Budget Cuts with Ghor, and `PZ` replaces one Orders Received with
-  Hive Mind Communication. A Chozo identity is renamed **Thoha** when it rolls
-  Quiet Robe and **Mawkin** when it rolls Raven Beak.
+- Batch profiles retain a recorded `faction_starters_enabled` flag for controlled
+  comparisons. Visible named-leader matches force their exact 10-card identity
+  starter. Batch-only BH and PZ acquisition profiles may still use their legacy
+  identity-tinted starter substitutions because no dedicated selectable BH or PZ
+  leader deck currently exists.
 - The home screen uses the centered `TITLELOGO` sprite in place of a rendered
   text title, scaled uniformly to fit the available header area.
 - During Slow AI-versus-AI games only, nameplate hard light reflects identity:
@@ -868,7 +900,8 @@ The title menu includes a fast AI-versus-AI batch configuration screen.
   match's crash-resistant rules and AI trace journal at a substantial speed
   cost.
 - The runner processes up to 500 AI decisions per rendered frame and replaces
-  the board with a minimal progress display.
+  the board with a minimal progress display. A completion bar fills after each
+  finished game and labels the exact completed count out of the batch total.
 - Raw match results are checkpointed to CSV after every completed game.
 - Each result is explicitly marked valid or invalid. Decision-safety exits
   record the pending choice, phase, turn, Mutation, event count, and last AI
@@ -941,19 +974,22 @@ one of the five concrete leaders at match start, and that resolved identity
 persists into rematches. Batch testing continues to use faction profiles
 directly.
 
-The title screen uses a persistent game-mode column and a contextual setup
-column. VS AI collects the human player's name and both deck choices; Hotseat
+The title screen uses an unlabeled navigation column and an unlabeled contextual
+setup column; redundant `GAME MODE` and `CONFIGURATION` headings are intentionally
+omitted. VS AI collects the human player's name and both deck choices; Hotseat
 collects two names and two decks; Network Play collects the local name and deck,
 then exposes Host and address/Join controls; AI vs AI collects two decks; and
-Settings exposes camera, debug, and UI-color controls. The three local modes use
-an explicit Play button. UI colors include an Auto choice that follows the
+Settings exposes camera, debug, and UI-color controls. Debug mode defaults off;
+Batch Tests and Regression Tests are removed from the navigation list entirely
+while it is disabled rather than remaining as inactive buttons. The three local
+modes use an explicit Play button. UI colors include an Auto choice that follows the
 resolved leader deck's faction color during play and uses the standard cyan
 accent on the title menu. Network peers exchange both names and
 resolved leader identities before constructing their synchronized decks.
 
 The provisional GF faction starter replaces the full neutral deck with two GF
-Soldiers; one each of GF Marine, G.F.S. Tyr, Adam Malkovich, Biologic Space
-Laboratories, Researcher, and Sloop; and two Private Military. Galactic
+Soldiers; two G.F.S. Tyr; one each of GF Marine, Adam Malkovich, Biologic Space
+Laboratories, and Researcher; and two Private Military. Galactic
 Federation HQ, Admiral Dane, and G.F.S. Olympus remain Shop progression pieces.
 
 The provisional SP faction starter contains one Zebesian Pirate; one Attack
@@ -1086,7 +1122,8 @@ seeds allow a match to be reproduced.
 
 The first playable scope is complete:
 
-1. Two copies of the Neutral starter deck.
+1. Two resolved 10-card identity starter decks, selected independently and allowed
+   to share cards where their authored lists overlap.
 2. Shop acquire/refill/refresh.
 3. Player draw, hand, discard, and reshuffle.
 4. CP economy and turn phases.

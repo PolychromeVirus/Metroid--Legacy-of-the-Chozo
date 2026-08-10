@@ -551,8 +551,21 @@ function loc_bootstrap_data() {
 
     fill_opening_shop = function() {
         var _queen_was_drawn = false;
+        var _opening_draw_attempts = 0;
+        var _opening_draw_limit = max(
+            1,
+            array_length(game_state.shop_deck) + 1
+        );
 
         while (array_length(game_state.shop_row) < 5) {
+            _opening_draw_attempts += 1;
+            if (_opening_draw_attempts > _opening_draw_limit) {
+                array_push(
+                    setup_errors,
+                    "The Shop could not fill five opening slots without revealing Queen Metroid Awakens."
+                );
+                return;
+            }
             if (array_length(game_state.shop_deck) <= 0) {
                 array_push(
                     setup_errors,

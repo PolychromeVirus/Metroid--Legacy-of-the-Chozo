@@ -19,7 +19,6 @@ function loc_abilities() {
                 break;
 
             case "loc.gf_marine":
-            case "loc.g_f_s_tyr":
                 array_push(_abilities, {
                     label: "EXHAUST: +1 CP",
                     cost_cp: 0,
@@ -28,6 +27,18 @@ function loc_abilities() {
                     target_kind: "",
                     prompt: "",
                     effect_kind: "gain_cp"
+                });
+                break;
+
+            case "loc.g_f_s_tyr":
+                array_push(_abilities, {
+                    label: "EXHAUST: SUPPORT SHIP",
+                    cost_cp: 0,
+                    cost_exhaust: true,
+                    cost_destroy: false,
+                    target_kind: "",
+                    prompt: "",
+                    effect_kind: "tyr_raid_support"
                 });
                 break;
 
@@ -40,18 +51,6 @@ function loc_abilities() {
                     target_kind: "ship",
                     prompt: "Select one of your Ships to ready.",
                     effect_kind: "ready_ship"
-                });
-                break;
-
-            case "loc.gf_soldier":
-                array_push(_abilities, {
-                    label: "PAY 1 + EXHAUST",
-                    cost_cp: 1,
-                    cost_exhaust: true,
-                    cost_destroy: false,
-                    target_kind: "ship",
-                    prompt: "Select one of your Ships to gain +1 Security this turn.",
-                    effect_kind: "ship_security_1"
                 });
                 break;
 
@@ -409,6 +408,20 @@ function loc_abilities() {
         if (_ability.target_kind == "dark_samus_character"
         && _source.phazon_tokens <= 0) {
             return false;
+        }
+        if (_ability.effect_kind == "tyr_raid_support") {
+            if (is_undefined(pending_choice)
+            || pending_choice.kind != "raid"
+            || pending_choice.stage != "defenders"
+            || game_state.priority_player != _source.controller) {
+                return false;
+            }
+            var _tyr_defender = raid_get_ship(
+                game_state.players[_source.controller],
+                pending_choice.defender_ship_id
+            );
+            return !is_undefined(_tyr_defender)
+                && _tyr_defender.instance_id != _source.instance_id;
         }
         if (_ability.target_kind == "own_phazon_source") {
             var _phazon_zones = [
@@ -892,6 +905,31 @@ function loc_abilities() {
                     "Dark Samus removed " + string(_ability.phazon_spent)
                     + " Phazon token(s) and discarded " + _dark_target_name + "."
                 );
+                return true;
+
+            case "tyr_raid_support":
+                if (is_undefined(pending_choice)
+                || pending_choice.kind != "raid"
+                || pending_choice.stage != "defenders") {
+                    return false;
+                }
+                var _tyr_target = raid_get_ship(
+                    game_state.players[_source.controller],
+                    pending_choice.defender_ship_id
+                );
+                if (is_undefined(_tyr_target)
+                || _tyr_target.instance_id == _source.instance_id) {
+                    return false;
+                }
+                var _tyr_security = card_has_faction(_tyr_target, "GF") ? 2 : 1;
+                _tyr_target.temporary_stat_bonus += _tyr_security;
+                array_push(
+                    game_state.event_log,
+                    "G.F.S. Tyr supported " + _tyr_target.definition.name
+                        + " for +" + string(_tyr_security)
+                        + " Security during the raid."
+                );
+                apply_phazon_interaction(_source, _tyr_target);
                 return true;
 
             case "dark_samus_consolidate":

@@ -580,7 +580,17 @@ function loc_rules() {
         }
         var _context = containment_resolution;
         var _player = game_state.players[_context.player_index];
+        var _containment_steps = 0;
+        var _containment_step_limit = max(1, array_length(_player.lab) + 1);
         while (true) {
+            _containment_steps += 1;
+            if (_containment_steps > _containment_step_limit) {
+                array_push(
+                    setup_errors,
+                    "Containment resolution stopped because it did not make progress."
+                );
+                return finish_containment_sequence();
+            }
             var _breach_index = -1;
             if (_context.forced_breach
             && array_length(_player.lab) > 0) {
@@ -649,6 +659,12 @@ function loc_rules() {
     };
 
     resolve_breach_character_choice = function(_character_index) {
+        if (!is_undefined(pending_choice)
+        && pending_choice.kind == "breach_character"
+        && variable_struct_exists(pending_choice, "gf_soldier_breach")
+        && pending_choice.gf_soldier_breach) {
+            return resolve_gf_soldier_breach_character(_character_index);
+        }
         if (is_undefined(pending_choice)
         || pending_choice.kind != "breach_character"
         || is_undefined(containment_resolution)) {
@@ -1749,14 +1765,24 @@ function loc_rules() {
                 "The Shop discard was recycled before Queen Metroid returned."
             );
         }
+        pending_choice = undefined;
+        if (array_length(game_state.shop_deck) <= 0) {
+            array_push(game_state.shop_deck, _queen);
+            array_push(
+                game_state.event_log,
+                "Queen Metroid returned to the Shop deck, but no other card was available to replace its slot."
+            );
+            return true;
+        }
+        // Fill the Event's slot before returning Queen to the draw pile so the
+        // same Queen cannot immediately draw and resolve herself again.
+        refill_shop();
         array_push(game_state.shop_deck, _queen);
         shuffle_array(game_state.shop_deck);
-        pending_choice = undefined;
         array_push(
             game_state.event_log,
             "Queen Metroid returned to the Shop deck and its slot was replaced."
         );
-        refill_shop();
         return true;
     };
 

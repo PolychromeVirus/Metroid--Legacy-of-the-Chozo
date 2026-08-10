@@ -199,7 +199,7 @@
         "deploy": 4,
         "reserve": 2
       },
-      "flavor": "Their aggressive and erratic behaviour is most likely due to the corrupting effects of Phazon in the Tallon IV environment.",
+      "flavor": null,
       "dual": true,
       "layout": "default",
       "source": {

@@ -315,7 +315,7 @@
         "Galactic Federation"
       ],
       "image": "Metroid_Other_M_Federation_Soldiers",
-      "effect": "@[cost,1]@[ex]: Target ship has +1 Security this turn",
+      "effect": "When a ship you control is destroyed from a raid, if GF Soldier is ready, @[ex] it and your opponent's lowest stage Metroid breaches.",
       "stat": {
         "kind": "strength",
         "value": 1
@@ -1024,7 +1024,7 @@
         "Galactic Federation"
       ],
       "image": "tyr_model",
-      "effect": "@[ex]: +1 CP",
+      "effect": "@[ex]: Select another ship you control that is being raided. If it is a Galactic Federation ship it gains 2 Security until end of turn, otherwise it gets 1",
       "stat": {
         "kind": "security",
         "value": 2
@@ -1056,7 +1056,7 @@
         "Galactic Federation"
       ],
       "image": "olympus_and_stiletto",
-      "effect": "If this ship exhausts for containment, also ready one Galactic Federation character",
+      "effect": "If this ship exhausts for containment, also ready one Galactic Federation character.\nWhen this ship is being raided, Galactic Federation characters contribute 1 more strength than normal.",
       "stat": {
         "kind": "security",
         "value": 4
