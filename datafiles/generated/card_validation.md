@@ -9,7 +9,7 @@
 
 | Pool | Worksheet | Unique definitions | Copies | File |
 |---|---|---:|---:|---|
-| loc | Cards | 47 | 124 | `cards_loc.json` |
+| loc | Cards | 50 | 131 | `cards_loc.json` |
 | lop | Set2 | 10 | 24 | `cards_lop.json` |
 | starter | Starter | 8 | 10 | `cards_starter.json` |
 | metroids | Metroids | 6 | 60 | `metroids.json` |

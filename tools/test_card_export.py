@@ -48,7 +48,7 @@ class CardExportTests(unittest.TestCase):
 
     def test_expected_pool_totals(self) -> None:
         expected = {
-            "cards_loc.json": (47, 124),
+            "cards_loc.json": (50, 131),
             "cards_lop.json": (10, 24),
             "cards_starter.json": (8, 10),
             "metroids.json": (6, 60),

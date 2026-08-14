@@ -9,6 +9,12 @@ function loc_regression() {
         var _saved_next_card_id = next_card_instance_id;
         var _saved_next_metroid_id = next_metroid_instance_id;
         var _saved_faction_starters_enabled = faction_starters_enabled;
+        var _saved_breaching_mutation =
+            settings_experimental_breaching_mutation;
+        var _saved_loaded_ships_exhausted =
+            settings_experimental_loaded_ships_exhausted;
+        settings_experimental_breaching_mutation = false;
+        settings_experimental_loaded_ships_exhausted = false;
         var _assert_context = {passed: 0, failed: 0, lines: []};
         var _assert = method(_assert_context, function(
             _condition,
@@ -95,6 +101,93 @@ function loc_regression() {
                 get_capture_cost(game_state.players[0]) == 1,
                 "Exhausted Gray Voice stops discounting Capture",
                 "Expected 1 CP."
+            );
+
+            _reset();
+            var _old_bird_player = game_state.players[0];
+            array_push(
+                _old_bird_player.board.characters,
+                make_card_instance(
+                    get_card_definition("loc.old_bird"), 0, "board"
+                )
+            );
+            array_push(
+                _old_bird_player.lab,
+                make_metroid_instance(
+                    get_metroid_definition("metroid.larva"), "lab"
+                )
+            );
+            array_push(
+                _old_bird_player.lab,
+                make_metroid_instance(
+                    get_metroid_definition("metroid.omega"), "lab"
+                )
+            );
+            _assert(
+                get_lab_hazard(_old_bird_player) == 6,
+                "Old Bird sets every Lab Metroid to 3 Hazard",
+                "Expected two Metroids to total exactly 6 Hazard."
+            );
+
+            _reset();
+            settings_experimental_loaded_ships_exhausted = true;
+            var _loaded_test_ship = make_card_instance(
+                get_card_definition("loc.attack_vessel"), 0, "board"
+            );
+            var _empty_test_ship = make_card_instance(
+                get_card_definition("loc.g_f_s_tyr"), 0, "board"
+            );
+            _loaded_test_ship.ready = false;
+            _empty_test_ship.ready = false;
+            array_push(
+                _loaded_test_ship.cargo,
+                make_metroid_instance(
+                    get_metroid_definition("metroid.larva"), "cargo"
+                )
+            );
+            var _ready_test_ships = [_loaded_test_ship, _empty_test_ship];
+            array_push(
+                game_state.players[0].board.ships,
+                _loaded_test_ship
+            );
+            resolve_lab_intake();
+            ready_card_array(_ready_test_ships, true);
+            _assert(
+                !_loaded_test_ship.ready
+                && _empty_test_ship.ready
+                && array_length(_loaded_test_ship.cargo) == 0
+                && array_length(game_state.players[0].lab) == 1
+                && !_loaded_test_ship.skip_ready_after_lab_intake,
+                "Ships loaded at turn start skip readying after Lab intake",
+                "Cargo failed to move or the intake marker did not suppress exactly one Ready phase."
+            );
+            settings_experimental_loaded_ships_exhausted = false;
+
+            _reset();
+            var _back_player = game_state.players[0];
+            var _back_removed = make_card_instance(
+                get_card_definition("loc.back_in_the_day"), 0, "removed"
+            );
+            array_push(game_state.removed_cards, _back_removed);
+            var _back_shop_copy = make_card_instance(
+                get_card_definition("loc.back_in_the_day"), -1, "shop_deck"
+            );
+            array_push(game_state.shop_deck, _back_shop_copy);
+            begin_back_in_the_day_choice(_back_player);
+            var _back_self_qualified = !is_undefined(pending_choice)
+                && pending_choice.kind == "back_in_the_day"
+                && raid_array_contains(
+                    pending_choice.candidate_ids, "loc.back_in_the_day"
+                );
+            resolve_back_in_the_day_choice(0);
+            _assert(
+                _back_self_qualified
+                && array_length(game_state.shop_deck) == 0
+                && array_length(_back_player.discard) == 1
+                && _back_player.discard[0].definition_id
+                    == "loc.back_in_the_day",
+                "Back In the Day can qualify itself after removal",
+                "The Shop copy was not found and moved to the player's discard."
             );
 
             _reset();
@@ -200,6 +293,70 @@ function loc_regression() {
                 _first_resolution && !_second_resolution,
                 "A doubled effect tolerates a vanished target",
                 "The empty second resolution did not fail safely."
+            );
+
+            _reset();
+            var _mawkin_source = make_card_instance(
+                get_card_definition("loc.mawkin_starship"), 0, "board"
+            );
+            var _mawkin_target = make_card_instance(
+                get_card_definition("loc.g_f_s_tyr"), 1, "board"
+            );
+            var _mawkin_flagship = make_card_instance(
+                get_card_definition("loc.g_f_s_olympus"), 1, "board"
+            );
+            array_push(
+                game_state.players[0].board.ships,
+                _mawkin_source
+            );
+            array_push(
+                game_state.players[1].board.ships,
+                _mawkin_target
+            );
+            array_push(
+                game_state.players[1].board.ships,
+                _mawkin_flagship
+            );
+            game_state.players[0].command_points = 3;
+            pending_choice = {
+                kind: "ability_target",
+                source: _mawkin_source,
+                source_kind: "ship",
+                source_index: 0,
+                target_kind: "mawkin_ship",
+                ability: {
+                    effect_kind: "discard_card",
+                    cost_cp: 3,
+                    cost_exhaust: true,
+                    cost_destroy: false
+                }
+            };
+            var _mawkin_resolved = resolve_ability_target_choice(
+                "opponent_ship", 0
+            );
+            _assert(
+                _mawkin_resolved
+                && !_mawkin_source.ready
+                && _mawkin_source.phazon_tokens == 2
+                && array_length(game_state.players[1].board.ships) == 1
+                && game_state.players[1].board.ships[0].definition_id
+                    == "loc.g_f_s_olympus"
+                && array_length(game_state.players[1].discard) == 1,
+                "Mawkin Starship discards an eligible Ship and gains two Phazon",
+                "The eligible Ship or post-resolution Phazon cost was not applied."
+            );
+            _assert(
+                !can_resolve_ability_target(
+                    {
+                        source: _mawkin_source,
+                        target_kind: "mawkin_ship",
+                        ability: {effect_kind: "discard_card"}
+                    },
+                    "opponent_ship",
+                    0
+                ),
+                "Mawkin Starship rejects Ships above its Security",
+                "G.F.S. Olympus was accepted despite exceeding Mawkin Starship's Security."
             );
 
             _reset();
@@ -362,12 +519,11 @@ function loc_regression() {
                 _profile_player
             );
             _assert(
-                abs((_gf_own_value - _gf_neutral_value) - 0.3) < 0.001
-                && abs((_gf_for_sp_value - _gf_neutral_value) + 0.25)
-                    < 0.001
+                abs(_gf_own_value - _gf_neutral_value) < 0.001
+                && abs(_gf_for_sp_value - _gf_neutral_value) < 0.001
                 && abs(_bh_for_gf_value - _bh_neutral_value) < 0.001,
-                "Main-faction AI profiles use light exclusionary preferences",
-                "Own, rival, or secondary-faction utility received the wrong bias."
+                "AI card utility is derived without faction preference drift",
+                "Changing the favored profile changed semantic card utility."
             );
 
             _reset();
@@ -537,7 +693,7 @@ function loc_regression() {
 
             _reset();
             for (var _queen_row_index = 0;
-                 _queen_row_index < 4;
+                 _queen_row_index < 3;
                  _queen_row_index++) {
                 array_push(
                     game_state.shop_row,
@@ -554,6 +710,12 @@ function loc_regression() {
                 "shop"
             );
             array_push(game_state.shop_row, _queen_card);
+            var _second_queen_card = make_card_instance(
+                get_card_definition("loc.queen_metroid_awakens"),
+                -1,
+                "shop"
+            );
+            array_push(game_state.shop_row, _second_queen_card);
             for (var _queen_discard_index = 0;
                  _queen_discard_index < 3;
                  _queen_discard_index++) {
@@ -569,18 +731,32 @@ function loc_regression() {
             pending_choice = {
                 kind: "queen_event",
                 stage: "resolved",
-                shop_index: 4,
+                shop_index: 3,
                 prompt: ""
             };
             random_set_seed(388);
             finish_queen_shop_event();
             var _queen_returned_to_deck = false;
+            var _queen_count_in_deck = 0;
             for (var _queen_deck_index = 0;
                  _queen_deck_index < array_length(game_state.shop_deck);
                  _queen_deck_index++) {
+                if (game_state.shop_deck[_queen_deck_index].definition_id
+                == "loc.queen_metroid_awakens") {
+                    _queen_count_in_deck += 1;
+                }
                 if (game_state.shop_deck[_queen_deck_index].instance_id
                     == _queen_card.instance_id) {
                     _queen_returned_to_deck = true;
+                }
+            }
+            var _queen_left_in_row = false;
+            for (var _queen_check_row_index = 0;
+                 _queen_check_row_index < array_length(game_state.shop_row);
+                 _queen_check_row_index++) {
+                if (game_state.shop_row[_queen_check_row_index].definition_id
+                == "loc.queen_metroid_awakens") {
+                    _queen_left_in_row = true;
                     break;
                 }
             }
@@ -589,9 +765,11 @@ function loc_regression() {
                 && array_length(game_state.shop_deck) == 3
                 && array_length(game_state.shop_discard) == 0
                 && _queen_returned_to_deck
+                && _queen_count_in_deck == 2
+                && !_queen_left_in_row
                 && is_undefined(pending_choice),
-                "Queen recycles an exhausted Shop deck before replacement",
-                "Queen was lost or immediately redrawn during resolution."
+                "Queen cleanup removes every visible Queen before replacement",
+                "A Queen was lost, left face-up, or immediately redrawn."
             );
 
             _reset();
@@ -737,6 +915,85 @@ function loc_regression() {
             );
 
             _reset();
+            var _transport_evolution_ship = make_card_instance(
+                get_card_definition("loc.chozo_transport"), 0, "board"
+            );
+            var _transport_gamma = create_metroid_for_stage(3);
+            _transport_gamma.zone = "ship";
+            _transport_gamma.host_ship_instance_id =
+                _transport_evolution_ship.instance_id;
+            array_push(_transport_evolution_ship.cargo, _transport_gamma);
+            array_push(
+                game_state.players[0].board.ships,
+                _transport_evolution_ship
+            );
+            resolve_end_turn_attachments();
+            _assert(
+                _transport_evolution_ship.cargo[0].definition.stage == 4
+                && game_state.mutation == 1,
+                "Chozo Transport evolves its cargo at end of its controller's turn",
+                "The carried Gamma failed to become a Zeta with normal Mutation."
+            );
+            game_state.active_player = 1;
+            resolve_end_turn_attachments();
+            _assert(
+                _transport_evolution_ship.cargo[0].definition.stage == 4
+                && game_state.mutation == 1,
+                "Chozo Transport does not evolve cargo on an opponent's turn",
+                "The carried Metroid evolved outside its controller's end step."
+            );
+
+            _reset();
+            var _teleport_station = make_card_instance(
+                get_card_definition("loc.teleport_station"), 0, "board"
+            );
+            var _teleport_source_ship = make_card_instance(
+                get_card_definition("loc.light_shuttle"), 0, "board"
+            );
+            var _teleport_destination_ship = make_card_instance(
+                get_card_definition("loc.chozo_transport"), 0, "board"
+            );
+            var _teleport_metroid = create_metroid_for_stage(2);
+            _teleport_metroid.zone = "ship";
+            _teleport_metroid.host_ship_instance_id =
+                _teleport_source_ship.instance_id;
+            array_push(_teleport_source_ship.cargo, _teleport_metroid);
+            array_push(
+                game_state.players[0].board.characters,
+                _teleport_station
+            );
+            array_push(
+                game_state.players[0].board.ships,
+                _teleport_source_ship
+            );
+            array_push(
+                game_state.players[0].board.ships,
+                _teleport_destination_ship
+            );
+            var _teleport_started = activate_selected_ability(
+                "character", 0, 0
+            );
+            var _teleport_source_chosen = resolve_ability_target_choice(
+                "ship", 0
+            );
+            var _teleport_finished = resolve_teleport_destination_choice(
+                "ship", 1
+            );
+            _assert(
+                _teleport_started
+                && _teleport_source_chosen
+                && _teleport_finished
+                && !_teleport_station.ready
+                && _teleport_station.phazon_tokens == 1
+                && array_length(_teleport_source_ship.cargo) == 0
+                && array_length(_teleport_destination_ship.cargo) == 1
+                && _teleport_destination_ship.cargo[0].instance_id
+                    == _teleport_metroid.instance_id,
+                "Teleport Station moves cargo to a different Chozo Ship",
+                "The move, exhaust cost, or Phazon drawback resolved incorrectly."
+            );
+
+            _reset();
             var _ghost_ai_source = make_card_instance(
                 get_card_definition("lop.chozo_ghosts"), 0, "discard"
             );
@@ -805,11 +1062,14 @@ function loc_regression() {
                 attacker_ability_bonus: 0,
                 defender_ability_bonus: 0
             };
-            var _tyr_test_resolved = activate_selected_ability(
+            var _tyr_test_started = activate_selected_ability(
                 "opponent_ship", 1, 0
             );
+            var _tyr_test_resolved = _tyr_test_started
+                && resolve_ability_target_choice("opponent_ship", 0);
             _assert(
-                _tyr_test_resolved
+                _tyr_test_started
+                && _tyr_test_resolved
                 && !_tyr_test_source.ready
                 && _tyr_test_olympus.temporary_stat_bonus == 2
                 && _tyr_test_source.phazon_tokens == 1,
@@ -1108,7 +1368,9 @@ function loc_regression() {
             );
             array_delete(game_state.players[0].board.characters, 0, 1);
             var _shifted_actual_strength = raid_exhaust_characters(
-                game_state.players[0], [_shifted_contributor_id]
+                game_state.players[0],
+                [_shifted_contributor_id],
+                undefined
             );
             _assert(
                 _shifted_actual_strength == _shifted_expected_strength
@@ -1161,15 +1423,52 @@ function loc_regression() {
             );
             array_push(game_state.players[0].board.ships, _timing_attacker);
             array_push(game_state.players[1].board.ships, _timing_defender);
-            game_state.players[0].command_points = 2;
-            begin_raid_choice(0);
-            select_raid_target(0);
+            var _timing_raid_cost = get_raid_cost(
+                game_state.players[0],
+                _timing_defender
+            );
             _assert(
-                !_timing_attacker.ready
+                _timing_raid_cost == get_card_stat(
+                    _timing_defender,
+                    "raid_defender_ship"
+                ),
+                "Raid cost uses an empty target Ship's current Security",
+                "Empty-Ship raid cost did not match current Security."
+            );
+            game_state.players[0].command_points = _timing_raid_cost;
+            begin_raid_target_choice(0);
+            var _raid_waited_for_attacker = !is_undefined(pending_choice)
+                && pending_choice.kind == "raid"
+                && pending_choice.stage == "attacker_ship"
+                && _timing_attacker.ready
+                && game_state.players[0].command_points == _timing_raid_cost;
+            select_raid_attacker(0);
+            _assert(
+                _raid_waited_for_attacker
+                && !_timing_attacker.ready
                 && _timing_defender.ready
                 && game_state.players[0].command_points == 0,
-                "Raid initiation exhausts only the attacking Ship",
-                "Readiness or the 2 CP raid cost resolved incorrectly."
+                "Raid declares its target before choosing and exhausting its attacker",
+                "Raid declaration, readiness, or target-based cost resolved incorrectly."
+            );
+
+            _reset();
+            var _priced_defender = make_card_instance(
+                get_card_definition("loc.light_shuttle"), 1, "board"
+            );
+            var _priced_alpha = make_metroid_instance(
+                get_metroid_definition("metroid.alpha"), "cargo"
+            );
+            var _priced_gamma = make_metroid_instance(
+                get_metroid_definition("metroid.gamma"), "cargo"
+            );
+            array_push(_priced_defender.cargo, _priced_alpha);
+            array_push(_priced_defender.cargo, _priced_gamma);
+            _assert(
+                get_raid_cost(game_state.players[0], _priced_defender)
+                    == _priced_gamma.definition.hazard,
+                "Raid cost uses the highest carried Metroid Hazard",
+                "Raid cost did not use the highest Hazard among multiple cargo."
             );
 
             _reset();
@@ -1513,6 +1812,104 @@ function loc_regression() {
             }
 
             _reset();
+            var _sp_starter_config = get_identity_starter_config(
+                "SP", "loc.zebesian_pirate"
+            );
+            _assert(
+                raid_array_contains(
+                    _sp_starter_config.deck_ids, "loc.frigate_orpheon"
+                )
+                && !raid_array_contains(
+                    _sp_starter_config.deck_ids, "loc.attack_vessel"
+                ),
+                "SP starter uses Frigate Orpheon instead of Attack Vessel",
+                "The experimental starter substitution was not preserved."
+            );
+
+            var _gf_flagship_config = get_identity_starter_config(
+                "GF", "loc.gf_marine"
+            );
+            var _gf_tyr_count = 0;
+            var _gf_olympus_count = 0;
+            for (var _gf_flagship_index = 0;
+                 _gf_flagship_index
+                    < array_length(_gf_flagship_config.deck_ids);
+                 _gf_flagship_index++) {
+                var _gf_flagship_id =
+                    _gf_flagship_config.deck_ids[_gf_flagship_index];
+                if (_gf_flagship_id == "loc.g_f_s_tyr") {
+                    _gf_tyr_count += 1;
+                } else if (_gf_flagship_id == "loc.g_f_s_olympus") {
+                    _gf_olympus_count += 1;
+                }
+            }
+            _assert(
+                _gf_tyr_count == 1 && _gf_olympus_count == 1,
+                "GF starter pairs one Tyr with one G.F.S. Olympus",
+                "The starter does not contain exactly one support Ship and one flagship."
+            );
+            var _na_starter_config = get_identity_starter_config(
+                "", "loc.armoured_frigate"
+            );
+            var _na_private_military_count = 0;
+            for (var _na_starter_index = 0;
+                 _na_starter_index
+                    < array_length(_na_starter_config.deck_ids);
+                 _na_starter_index++) {
+                if (_na_starter_config.deck_ids[_na_starter_index]
+                == "starter.private_military") {
+                    _na_private_military_count += 1;
+                }
+            }
+            _assert(
+                array_length(_na_starter_config.deck_ids) == 10
+                && raid_array_contains(
+                    _na_starter_config.deck_ids, "loc.delano_7"
+                )
+                && raid_array_contains(
+                    _na_starter_config.deck_ids,
+                    "lop.hive_mind_communication"
+                )
+                && raid_array_contains(
+                    _na_starter_config.deck_ids, "lop.dark_samus"
+                )
+                && raid_array_contains(
+                    _na_starter_config.deck_ids, "loc.gandrayda"
+                )
+                && raid_array_contains(
+                    _na_starter_config.deck_ids, "loc.security_guard"
+                )
+                && _na_private_military_count == 2
+                && !raid_array_contains(
+                    _na_starter_config.deck_ids, "starter.orders_received"
+                )
+                && !raid_array_contains(
+                    _na_starter_config.deck_ids, "starter.budget_cuts"
+                )
+                && !raid_array_contains(
+                    _na_starter_config.deck_ids, "loc.b_s_l_ship"
+                )
+                && !raid_array_contains(
+                    _na_starter_config.deck_ids, "starter.ship_captain"
+                )
+                && !raid_array_contains(
+                    _na_starter_config.deck_ids, "starter.sloop"
+                ),
+                "NA starter links Dark Samus to its Phazon package",
+                "The neutral starter substitutions were not preserved."
+            );
+            _assert(
+                batch_profile_faction("CZT") == "CZ"
+                && batch_profile_faction("CZM") == "CZ"
+                && batch_identity_starter_id("CZT", 388, "A")
+                    == "loc.quiet_robe"
+                && batch_identity_starter_id("CZM", 388, "A")
+                    == "loc.raven_beak",
+                "Batch separates Thoha and Mawkin starter profiles",
+                "CZT/CZM did not retain CZ drafting with fixed starter identities."
+            );
+
+            _reset();
             var _zebesian = make_card_instance(
                 get_card_definition("loc.zebesian_pirate"), 0, "board"
             );
@@ -1565,6 +1962,148 @@ function loc_regression() {
                 "The tactical raid was rejected with a threatened Lab or accepted with an empty Lab."
             );
 
+            var _planner_candidates = [
+                {
+                    kind: "test", index: 0, secondary: -1,
+                    source_kind: "", ability_index: -1,
+                    cost: 2, value: 1.10, groups: ["greedy"],
+                    is_event: false, name: "GREEDY"
+                },
+                {
+                    kind: "test", index: 1, secondary: -1,
+                    source_kind: "", ability_index: -1,
+                    cost: 1, value: 0.70, groups: ["setup"],
+                    is_event: false, name: "SETUP"
+                },
+                {
+                    kind: "test", index: 2, secondary: -1,
+                    source_kind: "", ability_index: -1,
+                    cost: 1, value: 0.70, groups: ["followup"],
+                    is_event: false, name: "FOLLOWUP"
+                }
+            ];
+            var _planner_combo = ai_plan_turn(_planner_candidates, 2);
+            _assert(
+                _planner_combo.first != 0
+                    && _planner_combo.value >= 1.39,
+                "AI planner prefers a stronger affordable action sequence",
+                "The planner chose the locally best action instead of the better two-action line."
+            );
+            var _future_candidate = [{
+                kind: "test", index: 0, secondary: -1,
+                source_kind: "", ability_index: -1,
+                cost: 4, value: 1.00, groups: ["future"],
+                is_event: false, earliest_phase: 1,
+                name: "NEXT TURN TEST"
+            }];
+            var _planner_bank = ai_plan_turn(_future_candidate, 0);
+            _assert(
+                _planner_bank.first < 0 && _planner_bank.value >= 0.69,
+                "AI planner banks CP for a valuable next-turn action",
+                "A future-only action was either executed early or ignored."
+            );
+            game_state.players[0].command_points = 4;
+            game_state.players[0].ai_hand_refresh_turn =
+                game_state.turn_number;
+            game_state.players[0].ai_shop_refresh_turn =
+                game_state.turn_number;
+            _assert(
+                ai_plan_hand_refresh(game_state.players[0]).score <= -100000
+                    && ai_score_shop_refresh(
+                        game_state.players[0], 0
+                    ) <= -100000,
+                "AI refresh actions are limited to once per turn",
+                "Replanning offered a second hand or Shop refresh in the same turn."
+            );
+
+            _reset();
+            var _removal_character = make_card_instance(
+                get_card_definition("starter.private_military"), 1, "board"
+            );
+            array_push(
+                game_state.players[1].board.characters,
+                _removal_character
+            );
+            game_state.players[1].deck = [];
+            _assert(
+                ai_board_card_removal_value(
+                    _removal_character, game_state.players[1]
+                ) > 0.02,
+                "An empty deck does not erase permanent removal value",
+                "A deployed Character was treated as worthless because its owner could shuffle the discard."
+            );
+
+            _reset();
+            var _empty_removal_ship = make_card_instance(
+                get_card_definition("starter.sloop"), 1, "board"
+            );
+            var _loaded_removal_ship = make_card_instance(
+                get_card_definition("starter.sloop"), 1, "board"
+            );
+            array_push(
+                _loaded_removal_ship.cargo,
+                // The other Sloop can safely contribute its 1 Security after
+                // this Larva reaches the Lab, so its expected scoring value is
+                // deliberately positive. An Alpha here would correctly be
+                // valued at zero with no Character Strength in the fixture.
+                create_metroid_for_stage(1)
+            );
+            array_push(
+                game_state.players[1].board.ships,
+                _empty_removal_ship,
+                _loaded_removal_ship
+            );
+            var _empty_ship_removal = ai_board_card_removal_value(
+                _empty_removal_ship, game_state.players[1]
+            );
+            var _loaded_ship_removal = ai_board_card_removal_value(
+                _loaded_removal_ship, game_state.players[1]
+            );
+            _assert(
+                _loaded_ship_removal > _empty_ship_removal,
+                "Removal values Metroid cargo lost with a Ship",
+                "A loaded Ship was not a more valuable removal target than an identical empty Ship."
+            );
+            _loaded_removal_ship.cargo[0] = create_metroid_for_stage(2);
+            var _possessed_cargo_loss = ai_containment_loss_at(
+                game_state.players[1], 0, 1
+            );
+            var _without_possessed_cargo_loss = ai_containment_loss_at(
+                game_state.players[1],
+                0,
+                1,
+                undefined,
+                _loaded_removal_ship.cargo[0].instance_id
+            );
+            _assert(
+                _possessed_cargo_loss > _without_possessed_cargo_loss,
+                "AI containment forecasts include Metroids aboard Ships",
+                "Ship cargo was omitted until it physically entered the Lab."
+            );
+
+            var _shared_target_candidates = [
+                {
+                    kind: "test", index: 0, secondary: -1,
+                    source_kind: "", ability_index: -1,
+                    cost: 0, value: 1, groups: ["target_99", "source_1"],
+                    is_event: false, name: "REMOVE A"
+                },
+                {
+                    kind: "test", index: 1, secondary: -1,
+                    source_kind: "", ability_index: -1,
+                    cost: 0, value: 1, groups: ["target_99", "source_2"],
+                    is_event: false, name: "REMOVE B"
+                }
+            ];
+            var _shared_target_plan = ai_plan_turn(
+                _shared_target_candidates, 0
+            );
+            _assert(
+                _shared_target_plan.value < 1.01,
+                "AI planner cannot remove the same projected target twice",
+                "Two removal abilities both claimed value from one target."
+            );
+
             _reset();
             game_state.priority_player = 1;
             pending_choice = {
@@ -1608,27 +2147,6 @@ function loc_regression() {
                 );
             }
 
-            var _gf_starter_config = get_identity_starter_config(
-                "GF", "loc.gf_marine"
-            );
-            var _gf_tyr_count = 0;
-            var _gf_sloop_count = 0;
-            for (var _gf_starter_index = 0;
-                 _gf_starter_index
-                    < array_length(_gf_starter_config.deck_ids);
-                 _gf_starter_index++) {
-                _gf_tyr_count += _gf_starter_config.deck_ids[_gf_starter_index]
-                    == "loc.g_f_s_tyr" ? 1 : 0;
-                _gf_sloop_count += _gf_starter_config.deck_ids[_gf_starter_index]
-                    == "starter.sloop" ? 1 : 0;
-            }
-            _assert(
-                array_length(_gf_starter_config.deck_ids) == 10
-                && _gf_tyr_count == 2
-                && _gf_sloop_count == 0,
-                "GF starter contains two G.F.S. Tyr and no Sloop",
-                "The defensive fleet starter composition was not preserved."
-            );
             var _mercy_started = check_alternate_end_conditions();
             var _mercy_waited = _mercy_started
                 && game_state.final_round_active
@@ -1695,6 +2213,9 @@ function loc_regression() {
         next_card_instance_id = _saved_next_card_id;
         next_metroid_instance_id = _saved_next_metroid_id;
         faction_starters_enabled = _saved_faction_starters_enabled;
+        settings_experimental_breaching_mutation = _saved_breaching_mutation;
+        settings_experimental_loaded_ships_exhausted =
+            _saved_loaded_ships_exhausted;
         var _stamp = batch_make_timestamp();
         var _path = working_directory
             + "loc_regression_" + _stamp + ".txt";

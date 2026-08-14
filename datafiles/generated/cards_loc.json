@@ -3,8 +3,8 @@
   "generated_from": "chozoreference.xlsx",
   "sheet": "Cards",
   "pool": "loc",
-  "unique_count": 47,
-  "copy_count": 124,
+  "unique_count": 50,
+  "copy_count": 131,
   "cards": [
     {
       "id": "loc.gandrayda",
@@ -959,7 +959,7 @@
         "Thoha"
       ],
       "image": "thoha_ship",
-      "effect": "Security +1 when defending against raids",
+      "effect": "Metroids onboard this ship evolve at the end of your turn.",
       "stat": {
         "kind": "security",
         "value": 3
@@ -992,7 +992,7 @@
         "Mawkin"
       ],
       "image": "mawkin_starship",
-      "effect": "@[cost,3]@[ex]: Discard one card your opponent controls",
+      "effect": "@[cost,3]@[ex]: Discard one ship  your opponent controls with security less than or equal to Mawkin Starship.\nPut two Phazon tokens on Mawkin Starship.",
       "stat": {
         "kind": "security",
         "value": 2
@@ -1320,7 +1320,7 @@
         "value": 2
       },
       "costs": {
-        "deploy": null,
+        "deploy": 5,
         "reserve": 3
       },
       "flavor": "A lust for power drives even civilians to the furthest lengths",
@@ -1352,7 +1352,7 @@
         "value": 1
       },
       "costs": {
-        "deploy": null,
+        "deploy": 4,
         "reserve": 2
       },
       "flavor": null,
@@ -1416,7 +1416,7 @@
         "value": 1
       },
       "costs": {
-        "deploy": null,
+        "deploy": 4,
         "reserve": 2
       },
       "flavor": null,
@@ -1521,6 +1521,105 @@
       "source": {
         "sheet": "Cards",
         "row": 48
+      }
+    },
+    {
+      "id": "loc.teleport_station",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 2,
+      "name": "Teleport Station",
+      "type": "character",
+      "faction_code": "CZ",
+      "factions": [
+        "CZ"
+      ],
+      "tags": [
+        "Chozo",
+        "Thoha"
+      ],
+      "image": "Teleport_Station",
+      "effect": "@[ex]: Move one Metroid from a ship you control to a Chozo ship you control, then Teleport Station gains a Phazon token",
+      "stat": {
+        "kind": "strength",
+        "value": 0
+      },
+      "costs": {
+        "deploy": 6,
+        "reserve": 3
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Cards",
+        "row": 49
+      }
+    },
+    {
+      "id": "loc.old_bird",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 2,
+      "name": "Old Bird",
+      "type": "character",
+      "faction_code": "CZ",
+      "factions": [
+        "CZ"
+      ],
+      "tags": [
+        "Chozo",
+        "Thoha"
+      ],
+      "image": "Old_Bird",
+      "effect": "All Metroids in your lab have 3 Hazard",
+      "stat": {
+        "kind": "strength",
+        "value": 0
+      },
+      "costs": {
+        "deploy": 5,
+        "reserve": 3
+      },
+      "flavor": null,
+      "dual": false,
+      "layout": "default",
+      "source": {
+        "sheet": "Cards",
+        "row": 50
+      }
+    },
+    {
+      "id": "loc.back_in_the_day",
+      "set": "LOC",
+      "pool": "loc",
+      "count": 3,
+      "name": "Back In the Day",
+      "type": "event",
+      "faction_code": "NACZ",
+      "factions": [
+        "NA",
+        "CZ"
+      ],
+      "tags": [
+        "Event"
+      ],
+      "image": "portrait",
+      "effect": "@[des]: Search the shop deck for a card that you already have in your deck, or has been previously played and removed from the game by you. Add it to your discard pile.",
+      "stat": {
+        "kind": null,
+        "value": null
+      },
+      "costs": {
+        "deploy": null,
+        "reserve": 5
+      },
+      "flavor": null,
+      "dual": true,
+      "layout": "default",
+      "source": {
+        "sheet": "Cards",
+        "row": 51
       }
     }
   ]

@@ -1,10 +1,10 @@
 # Legacy of the Chozo - Project Reference
 
 Status: playable digital rules-engine prototype  
-Players: 2, competitive  
+Players: 2 seated competitors, with additional network spectators  
 Theme: Metroid factions competing to capture and study Metroids  
 Current implementation: complete first-pass rules engine, board interface, AI,
-hotseat, and direct-IP network play
+hotseat, direct-IP network lobbies, and spectator play
 
 ## 1. Purpose and source of truth
 
@@ -153,7 +153,7 @@ The active player may take actions in any order and may repeat them while able t
 | Play from hand | For a non-Event, pay its Reserve cost again and put it into play |
 | Play an Event | Once per turn; play it from hand for no CP cost |
 | Capture | Pay 1 CP and exhaust a Ship; move an eligible Metroid from SR388 onto it |
-| Raid | Pay 2 CP and resolve a Ship-versus-Ship raid |
+| Raid | Pay the target's highest carried Hazard, or its current Security when empty, and resolve a Ship-versus-Ship raid |
 | Salvage | Discard any number of your ready Characters, Ships, or Locations one at a time; gain CP equal to half that card's printed Reserve cost, rounded down |
 | Refresh hand | Pay 1 CP; discard any number of cards, then draw until holding five |
 | Refresh Shop | Pay 1 CP; discard all five Shop cards and refill the row |
@@ -234,8 +234,12 @@ If no Ship contributes Security to the check, every Omega in the Lab breaches si
 
 ## 10. Raids
 
-1. The attacker pays 2 CP, chooses one of their ready Ships, and exhausts it. Apply any ready-card raid-cost modifiers before payment; for example, each ready Chozo Warrior reduces this cost by 1 CP.
-2. The attacker chooses an opposing Ship. The defending Ship does not exhaust merely for defending.
+1. The attacker chooses an opposing Ship and pays CP equal to the highest Hazard
+   among its cargo, or its current Security if it is empty. Apply any ready-card
+   raid-cost modifiers before payment; for example, each ready Chozo Warrior
+   reduces this cost by 1 CP.
+2. The attacker then chooses one of their ready Ships and exhausts it. The
+   defending Ship does not exhaust merely for defending.
 3. The attacker may exhaust Characters and activate effects to raise their Ship's Security.
 4. The defender may then do the same.
 5. The side with the lower final Security loses. On a tie, both sides lose.
@@ -267,6 +271,13 @@ three Phazon. Hunters retain normal breach priority; otherwise the lowest numeri
 Metroid stage is chosen.
 
 Raid participants are tracked by immutable card instance IDs rather than board-array positions. Removing or inserting unrelated cards cannot change which Characters contribute or which Vehicles are fighting. A contributor that leaves play stops contributing. If either participating Vehicle leaves play during an ability sequence, the Raid ends immediately when that sequence completes and the event log identifies the missing side.
+
+Headless paired batch games configure both deck seats and the opening player
+before resolving opening containment, income, and ready phases. Leg one seats
+deck A as Player 1 and deck B as Player 2; leg two swaps them. Player 1 opens in
+both legs, so each deck receives one normal 4 CP opening turn per paired seed.
+This treats seat and turn order as the same balance variable and prevents swapped
+legs from producing empty opening turns or 8 CP follow-up turns.
 
 ## 11. SR388 and Metroid evolution
 
@@ -393,23 +404,28 @@ effects, containment, mutation, raids, Phazon, board presentation, and game-end
 handling are implemented.
 
 The title menu offers two-player hotseat, human-versus-AI, direct-IP hosting,
-and direct-IP joining. In AI mode, Player 1 remains the visible human board and
+joining, and spectating. In AI mode, Player 1 remains the visible human board and
 the AI hand is hidden. The AI is a deliberately readable utility-based
 opponent. It resolves mandatory choices, containment, card play, Shop
 purchases, Metroid captures, activated abilities, raid initiation, raid
 contributions, raid abilities, and raid defense with short visible pauses
 between decisions.
 
-The title menu also offers direct-IP network hosting and joining. Network
-play uses host-authoritative TCP command replication on port `6510`. The host
-chooses a random seed, both peers rebuild the same deterministic match, and
+The title menu also offers direct-IP network hosting and joining. Network play
+uses a host-authoritative pregame lobby and TCP command replication on port
+`6510`. Participants claim either player seat or remain spectators, select a
+leader, and ready before the host starts the match. The host chooses a random
+seed, both peers rebuild the same deterministic match, and
 the guest sends action intentions which the host validates and commits in
 sequence. Each installation keeps its local player's board and hand view fixed.
 Local test mutations and unsynchronized keyboard shortcuts are disabled during
 network matches. The main-menu player-name field supplies Player 1's name in
 solo, hotseat, and hosted games. Joining players may edit their name alongside
 the host address; both names are exchanged during the network handshake and
-used throughout the event log.
+used throughout the event log. Spectators have their own chat identity, cannot
+issue gameplay commands, may switch the viewed seat, and can toggle a camera-
+anchored peek of both hands. AI-versus-AI uses the same spectator presentation
+for local inspection.
 
 For local testing, run two game instances, host on the first, and join
 `127.0.0.1` on the second. For LAN testing, join the host's LAN IPv4 address.
@@ -437,12 +453,16 @@ structural gaps.
 Additional non-testing work still planned:
 
 - continued starter-deck and LOP balance testing;
+- AI multi-turn threat planning, especially the risk between capturing cargo and
+  banking it, protecting loaded Ships, holding CP for off-turn effects, and
+  recognizing favorable Raid windows;
 - focused timing audits for off-turn triggers, priority changes, nested choices,
   target/source removal, and Phazon exhaustion;
 - wording and terminology polish for the implemented Help page, contextual help,
   and first-game guidance;
-- a pregame network lobby with player seats, spectator support, and host-owned
-  match settings;
+- future expansion of the implemented two-seat network lobby toward the original
+  2-4 player design; rules, board layout, and turn structure are still strictly
+  two-player;
 - continued board, menu, prompt, and animation polish discovered through test games;
 - Lab danger-readout cleanup so current Hazard, available containment Strength,
   and breach risk are easier to distinguish at a glance;
@@ -475,7 +495,7 @@ contributors, defensive abilities modifying unlocked totals, Pirate Destroyer
 readying after a win, and Queen and SA-X special containment completing across
 both players.
 
-### Working implementation checkpoint — August 10, 2026
+### Working implementation checkpoint — August 13, 2026
 
 The prototype is currently playable in hotseat, human-versus-AI, and direct-IP
 host/guest modes. The implemented rules include the complete current card pool,
@@ -784,21 +804,78 @@ Current AI decisions:
   exceeds that estimate.
 - When defending, it uses Samus's repeatable +1 raid defense only when the CP
   can improve the outcome, then commits enough Characters to win or tie.
-- Card valuation now rewards existing faction concentration and each faction's
-  mechanical identity: GF economy, SP Ships/raids, CZ Metroid/removal, BH
-  activations, and PZ board concentration.
+- AI utility is normalized in capture value (`CV`): `1 CV` is the expected
+  value of safely capturing one Research worth of Metroid cargo and banking it.
+  Ending the turn is the zero-delta baseline; actions must improve the evaluated
+  state by more than `0.02 CV`.
+- Card valuation no longer rewards printed faction, effect-text presence, or
+  hand size. It derives value from current Strength/Security thresholds, Ship
+  access, containment exposure, semantic removal/buff/cleanse/Phazon/Metroid/
+  economy roles, valuable opposing targets, and relevant future Phazon support
+  in the deck/discard.
+- CP has no flat per-token score. The action phase uses a bounded, memoized beam
+  planner to compare complete affordable sequences instead of subtracting an
+  independently estimated CP penalty from each action. It searches up to three
+  paid actions and five total actions, with resource-conflict groups preventing
+  the same card, target, event allowance, or refresh contents from being reused.
+- The planner can end the current turn and add the normal 4 CP income once to
+  inspect discounted next-turn access (`0.7` of current value). It therefore
+  banks when that future line is stronger, then replans from the real game state
+  after every executed action rather than assuming projected effects occurred.
+- Exact planner states are memoized by phase, CP, paid depth, step count, and
+  consumed resources; a 48-state beam bounds simulation overhead.
+- Captures multiply Research by estimated cargo survival and containment
+  success. Raid and removal scores use the board and cargo actually endangered,
+  while cleanse access respects current Phazon exposure and real event/deploy/
+  activation timing.
+- Containment value simulates the actual breach order (Hunters first, then the
+  highest stage), the Character discarded after each breach, cascading lost
+  Strength, the single best eligible Ship, and the Omega Ship requirement.
+  Its forecast treats every Metroid in the Lab or aboard any controlled Ship as
+  already in the player's possession because all Ship cargo moves into the Lab
+  before containment. Proposed Captures are added to that complete possession
+  set. With Loaded Ships Stay Exhausted enabled, a Ship currently carrying cargo
+  is not projected as an eligible containment contributor on that intake turn.
+  Playing a Character or Ship receives the Research/board loss it prevents;
+  exhausting one, including as a raid contributor, is charged the additional
+  containment loss it exposes.
+- Successful raids value the destroyed Ship as an opponent-board delta and its
+  cargo as a Research swing: denial always counts, and acquisition counts again
+  when the attacking Ship has legal space and Security. Destroying an opponent's
+  final Ship also includes the capture/transport access removed from its board.
+- Discard removal evaluates the immediate deployed-state loss; it is not reduced
+  merely because the card enters discard and might later be shuffled, drawn,
+  paid for, and replayed. Character and Ship targets include intrinsic body and
+  ability access, containment thresholds, raid contribution, and beneficial
+  attachments lost with the host. Ship targets additionally include expected
+  cargo Research denial and the capture access lost when the final Ship leaves.
+  Expected cargo value is discounted by its carrier survival and the additional
+  containment loss that cargo was projected to create.
+- Targeted ability candidates reserve their projected target in the turn planner,
+  preventing two removal effects from claiming value for the same permanent.
+- Capture candidates share a projection resource: the planner executes at most
+  one independently scored Capture before replanning. The next decision then
+  includes the newly carried Metroid in the full possession/containment forecast,
+  preventing several captures from each being valued against the same old Lab.
+- Candidate journal entries decompose board/effect value, expected Research,
+  survival, CP opportunity cost, discounted future access, and net CV. Repeated
+  card measurements are cached for a single decision pass to limit batch cost.
 - Hand refreshes are evaluated from the known composition of the AI's remaining
   deck, never its order. The AI compares each card in hand with the average
-  utility of an unknown draw, selects only sufficiently weak cards, and weighs
-  their combined expected improvement against the 1 CP action cost.
+  utility of an unknown draw, selects only cards at least `0.25 CV` worse, and
+  weighs their combined expected improvement against the 1 CP action cost.
+  Reserve cost does not reduce a card's keep value because the turn planner
+  handles affordability and future access directly. The AI may refresh its hand
+  only once per turn so replanning cannot repeatedly cycle replacement hands.
 - Human players enter a refresh selection mode, toggle any number of cards in
   hand, then confirm or cancel. Confirmation pays 1 CP, discards the selected
   cards, and draws until the player holds five cards. A player already below
   five may select zero cards and use the action solely to refill their hand.
 - Shop refreshes likewise use only the composition of the unknown Shop pool.
-  The AI estimates the best useful and affordable acquisition among five
-  replacement cards after paying the refresh cost, then compares that estimate
-  with the best card already visible in the row.
+  The AI calculates the exact expected maximum of an unordered five-card sample
+  after paying the refresh cost, then compares it with the best card already
+  visible in the row; it never consults the deck's order.
+  AI Shop refreshes are also limited to once per turn.
 - Both refresh actions compete directly with playing cards, capturing, raiding,
   activating abilities, and acquiring visible Shop cards. They are not
   automatic fallback actions.
@@ -845,29 +922,17 @@ A completed journal contains:
 
 The title menu includes a fast AI-versus-AI batch configuration screen.
 
-- Each AI can favor `GF`, `SP`, `CZ`, `BH`, or `PZ`, or use `NONE` for the
-  normal adaptable synergy model.
-- A normal VS-AI match randomly assigns its opponent any of the six acquisition
-  profiles used in batch testing and presents it as an in-world identity:
-  `NONE` is **Mercenary**, `GF` is **Galactic Federation**, `SP` is
-  **Space Pirate**, `CZ` is **Chozo**, `BH` is **Bounty Hunter**, and `PZ` is
-  **Phazon**. The combined `CZ` profile does not currently distinguish Thoha
-  from Mawkin priorities.
-- Slow AI-versus-AI mode independently assigns the same profile identities to
-  both visible AI players. Identical-profile mirror matches remain possible;
-  those names receive `Alpha` and `Beta` suffixes for clarity.
-- Batch profiles retain a recorded `faction_starters_enabled` flag for controlled
-  comparisons. Visible named-leader matches force their exact 10-card identity
-  starter. Batch-only BH and PZ acquisition profiles may still use their legacy
-  identity-tinted starter substitutions because no dedicated selectable BH or PZ
-  leader deck currently exists.
+- Each AI can use `GF`, `SP`, `CZT`, `CZM`, or `NA` identity starters. Drafting
+  is independently either adaptable or focused; adaptable is the normal balance
+  configuration and adds no faction preference to Shop choices.
+- Normal VS-AI and Slow AI-versus-AI matches use the same named leader starters
+  as human play. Batch profiles resolve directly to NA, GF, SP, CZT, or CZM;
+  Thoha and Mawkin are kept separate throughout scheduling and reporting.
 - The home screen uses the centered `TITLELOGO` sprite in place of a rendered
   text title, scaled uniformly to fit the available header area.
-- During Slow AI-versus-AI games only, nameplate hard light reflects identity:
-  grey `NONE`, cyan `GF`, red `SP`, yellow `CZ`, green `BH`, and dark blue `PZ`.
-  The batch-results matrix uses the same colors for its Player 1 column and
-  Player 2 row labels. These values are centralized in the `LOC_COLOR_*`
-  GameMaker macros at the top of `obj_bootstrap`'s Create event.
+- During Slow AI-versus-AI games, nameplate hard light reflects each resolved
+  identity. The batch-results matrix uses the corresponding colors for its
+  Player 1 column and Player 2 row labels.
 - The game-over summary uses fitted winner titles and palette-aware player
   panels. Standard player-versus-player/AI presentation uses cyan for Player 1
   and red for Player 2; Slow AI-versus-AI uses each selected identity palette.
@@ -885,24 +950,36 @@ The title menu includes a fast AI-versus-AI batch configuration screen.
   records whether starters were enabled and the exact starter assigned to each
   seat. Paired legs preserve the same starter for deck A and deck B when seats
   swap; this is especially important for the Thoha/Mawkin split.
+- Starter identity and AI drafting preference are independent batch settings.
+  `ADAPTABLE` drafting, the default, uses faction starter decks without any
+  faction bonus or off-faction penalty in Shop scoring. `FOCUSED` preserves the
+  older faction-biased acquisition model for deliberately tribal simulations.
+  Reports and CSV rows record the selected drafting mode, while favored-card
+  totals continue measuring cards matching each deck's starter identity.
 - A selected matchup can run for 1, 10, 50, 100, or 500 paired seeds. Each
   seed produces two games, with the same two deck profiles swapping Player
   Slot 1 and Player Slot 2.
-- Matrix mode runs all 21 unordered pairings of the five factions and `NONE`.
-  Pairings with different profiles receive the mirrored two-game treatment.
-- Same-profile pairings are not mirrored because swapping two identical AI
-  profiles does not create a distinct seat configuration. A full matrix
-  therefore runs 36 games per paired-seed count rather than 42.
-- The same deck takes the first turn in both legs of a pair, isolating seat
-  position from initiative. The starting deck alternates between successive
-  paired seeds.
-- Fast mode suppresses per-decision journals. Detailed mode retains each
-  match's crash-resistant rules and AI trace journal at a substantial speed
-  cost.
+- Full matrix mode runs all 25 ordered Player 1/Player 2 combinations of NA, GF,
+  SP, CZT, and CZM. The schedule is grouped by Player 1 profile from left to
+  right, so each completed matrix column forms a natural recovery boundary.
+- A matrix filter can instead run only games containing one selected profile.
+  It includes that profile's mirror and both seat orders against every other
+  starter; at 100 paired seeds, a filtered matrix contains 900 games.
+- Deck A is Player 1 and opens leg one; deck B is Player 1 and opens leg two.
+  Starter decks are constructed and shuffled in persistent A-then-B order in
+  both legs, preserving each deck's opening hand and the shared Shop state while
+  reversing which deck takes the first turn.
+- Detailed journals default on. A match buffers its journal in memory, writes it
+  once at game end, and prints only a compact winner/final-score summary to the
+  console. Fast mode can still suppress per-decision journals entirely.
 - The runner processes up to 500 AI decisions per rendered frame and replaces
   the board with a minimal progress display. A completion bar fills after each
   finished game and labels the exact completed count out of the batch total.
-- Raw match results are checkpointed to CSV after every completed game.
+- Raw match results are appended to CSV after every completed game. A separate
+  `loc_batch_checkpoint.json` stores the complete batch state at launch and after
+  every completed Player 1 column. `RESUME CHECKPOINT` restores its schedule,
+  results, settings, output paths, and next match; a crash during a column reruns
+  only that incomplete column rather than losing earlier columns.
 - Each result is explicitly marked valid or invalid. Decision-safety exits
   record the pending choice, phase, turn, Mutation, event count, and last AI
   action instead of silently treating the partial state as clean data.
@@ -918,18 +995,18 @@ The title menu includes a fast AI-versus-AI batch configuration screen.
   Per-player telemetry additionally records peak CP, captures, raids initiated
   and won, breaches suffered, final Metroid and Research totals by stage, and
   the most frequently acquired Shop card.
-- Completion produces a text report summarizing wins from Player Slot 1,
-  wins from Player Slot 2, two-leg sweeps ("both" seats), split pairs, draws,
+- Completion produces a text report summarizing first-player wins,
+  second-player wins, paired sweeps, split pairs, draws,
   average turns, average Research, and average favored-card acquisition by
-  matchup. It also includes aggregate slot and sweep results per profile.
-- Completion opens a seat-oriented results matrix with Player 1 profiles across
-the top and Player 2 profiles down the left. Each cell shows Player 1's win
-percentage for that exact seat configuration, with whole-number values colored
-on a white-at-0% to green-at-100% gradient. A bottom control toggles the cells
-between percentages and Player 1's `wins/losses - draws`. The header states
-the total games processed and scheduled games per seat matchup. Cells
-containing any invalid games use a red background to identify contaminated
-configurations.
+  matchup. It also includes aggregate turn-order and sweep results per profile.
+- The running screen and completed report share the same turn-order matrix, with
+  first-player profiles across the top and second-player profiles down the left.
+  Labels and percentages use native `FNT_METROID` scale on integer-aligned pixel
+  coordinates. Each cell shows Player 1's percentage on a white-at-0% to
+  green-at-100% gradient and lists `wins/losses - draws` below it. Draws count as
+  half a win by default; the report control can switch to raw wins. Cells
+  containing invalid games use a red background to identify contaminated
+  configurations.
 
 Batch matches have independent 500-turn and AI-decision safety limits. The turn
 limit prevents a strategically nonterminal game from accumulating enough board
@@ -941,10 +1018,39 @@ Researcher requires one discard for each card it successfully draws. If the
 deck and discard pile cannot supply every requested draw, only the cards actually
 drawn must be discarded; drawing none creates no pending choice.
 
-The completed batch report is paginated. Its first page is the seat-oriented
-win-rate matrix. Four profile pages follow (neutral, GF, SP, and CZ), each aggregating point rate,
+The completed batch report is paginated. Its first page is the turn-order
+win-rate matrix. Five profile pages follow (NA, GF, SP, CZT, and CZM), each aggregating point rate,
 per-game behavior, head-to-head results, Research contribution by Metroid
-stage, and the profile's most frequently acquired Shop card.
+stage, and the profile's most frequently acquired Shop card. The left margin
+shows batch settings on the matrix page and the selected profile's complete
+starter deck, one card per native-scale grey line, on each profile page; CZT and
+CZM resolve to their distinct Quiet Robe and Raven Beak lists. Profile titles
+use crisp integer-aligned 3x `FNT_METROID`; the behavior, Research-stage, and
+matchup columns are spread across the panel, while most-taken/raid/breach detail
+sits beneath the starter-deck list rather than across the bottom of the panel.
+
+#### Balance checkpoint — August 13, 2026
+
+The latest completed full matrix contains 2,500 valid games: 100 paired seeds
+for every ordered starter matchup, adaptable drafting, Breaching Mutation on,
+and Loaded Ships Stay Exhausted on. No unresolved-choice, safety-limit, or
+invalid-game errors were found in the completed journals. Non-mirror point rates,
+with draws worth half a win, were GF 55.9%, SP 52.8%, NA 50.4%, CZT 49.9%, and
+CZM 41.0%. Player 1's overall point rate was 51.8%.
+
+The corresponding unordered matchup point rates for the first named profile
+were: NA/GF 49.0%, NA/SP 42.3%, NA/CZT 53.0%, NA/CZM 57.5%, GF/SP 52.5%,
+GF/CZT 55.8%, GF/CZM 64.5%, SP/CZT 52.3%, SP/CZM 53.5%, and CZT/CZM 60.5%.
+These figures are a playtest checkpoint, not target balance guarantees.
+
+CZM's weak aggregate result currently appears strategic rather than a rules
+defect. In its losses it captures nearly as often as in its wins, but converts
+far less cargo into Research and wins materially fewer Raids. The current AI
+executes the Mawkin starter too linearly and does not yet manage its multi-turn
+choice between setup, cargo protection, CP banking, Samus activation, and waiting
+for a favorable Raid window. No immediate CZM card change is planned: the next
+relevant AI improvement is adversarial cargo-risk and threat-window planning,
+including treating loaded Ships as possessions that must survive until intake.
 
 Only GF, SP, and CZ have focused acquisition profiles. A focused AI receives a
 very small bonus for its own faction and a slight penalty for each of the other
@@ -982,26 +1088,56 @@ then exposes Host and address/Join controls; AI vs AI collects two decks; and
 Settings exposes camera, debug, and UI-color controls. Debug mode defaults off;
 Batch Tests and Regression Tests are removed from the navigation list entirely
 while it is disabled rather than remaining as inactive buttons. The three local
-modes use an explicit Play button. UI colors include an Auto choice that follows the
-resolved leader deck's faction color during play and uses the standard cyan
-accent on the title menu. Network peers exchange both names and
-resolved leader identities before constructing their synchronized decks.
+  modes use an explicit Play button. UI colors include an Auto choice that follows the
+  resolved leader deck's faction color during play and uses the standard cyan
+  accent on the title menu. Network peers exchange both names and
+  resolved leader identities before constructing their synchronized decks.
 
-The provisional GF faction starter replaces the full neutral deck with two GF
-Soldiers; two G.F.S. Tyr; one each of GF Marine, Adam Malkovich, Biologic Space
-Laboratories, and Researcher; and two Private Military. Galactic
-Federation HQ, Admiral Dane, and G.F.S. Olympus remain Shop progression pieces.
+The main-menu Settings page contains an Experimental Gameplay Toggles section
+that is intentionally unavailable from the in-match Options page. `BREACHING
+MUTATION` makes every containment breach cause a Mutation roll. `LOADED SHIPS
+STAY EXHAUSTED` records which Ships carried cargo when their controller's turn
+began; those Ships do not ready in that start phase even though their Metroids
+move into the Lab before the normal ready step. Both flags are persisted,
+included in network match setup, recorded in batch CSV/report metadata, and
+restored by batch checkpoints.
 
-The provisional SP faction starter contains one Zebesian Pirate; one Attack
-Vessel; one each of Sloop, Beam Pirate, Space Pirate Homeworld, Researcher, Ship
-Captain, and Orders Received; and two Private Military. Mother Brain, Pirate
-Destroyer, Frigate Orpheon, and SA-X Breaks Out remain Shop progression pieces.
+The current GF starter contains two GF Soldiers; one each of GF Marine, G.F.S.
+Tyr, G.F.S. Olympus, Adam Malkovich, Biologic Space Laboratories, and Researcher;
+and two Private Military. Galactic Federation HQ and Admiral Dane remain Shop
+progression pieces.
+
+The current SP starter contains one each of Zebesian Pirate, Frigate Orpheon,
+Sloop, Beam Pirate, Space Pirate Homeworld, Researcher, Ship Captain, and Orders
+Received; and two Private Military. Mother Brain, Pirate Destroyer, Attack
+Vessel, and SA-X Breaks Out remain Shop progression pieces.
 
 The provisional CZ starter has separate Thoha and Mawkin configurations. Both
 contain Samus Aran, Gunship, Researcher, Ship Captain, two Private Military,
 Orders Received, and Away Team. Thoha adds Quiet Robe and Chozo Transport;
 Mawkin adds Chozo Warrior and Mawkin Starship. Raven Beak remains a Shop
 progression card while still serving as the persisted Mawkin identity marker.
+
+The current NA starter is Dark Samus, Gandrayda, two Private Military,
+Researcher, Security Guard, Hive Mind Communication, Away Team, Delano 7, and
+Armoured Frigate. It deliberately combines neutral, Bounty Hunter, and Phazon
+tools: Dark Samus and Hive Mind form its Phazon consolidation engine, while
+Delano 7 and Security Guard support containment and Away Team supports capture.
+
+Chozo Transport no longer receives a generic defensive Security bonus. At the
+end of its controller's turn, every non-Hunter Metroid below Omega aboard it
+evolves one stage. Zeta and Omega births advance Mutation normally, including
+the late-game two-space Omega advance; reaching the Mutation limit ends the
+game before the ordinary SR388 evolution step.
+
+Teleport Station is a 0-Strength Thoha Character. Exhausting it selects a Ship
+the controller owns with cargo, then moves that Metroid to a different Chozo
+Ship the controller owns with open cargo space. A successful move gives
+Teleport Station one Phazon token. It uses the normal card-anchored ability and
+target flow during Raid priority, allowing cargo to be evacuated before Raid
+resolution; both targeted Ships process normal Phazon interaction. The AI
+prioritizes valuable cargo on a participating Raid Ship and prefers Chozo
+Transport as the destination when legal.
 
 The game-end dialog shows turn/seed information and compact
 capture/raid/breach/evolution totals. Each player panel uses its identity palette,
@@ -1136,8 +1272,10 @@ The first playable scope is complete:
 
 This scope supports human playtesting and recorded AI matches for game length,
 CP pressure, capture rate, raid frequency, breach rate, card use, and scoring
-pace. Automated AI-versus-AI batches and cross-match aggregation are the next
-balance-instrumentation milestone.
+pace. Automated paired AI matrices, live aggregation, detailed journals,
+faction-filtered runs, and disk-backed column checkpoint/resume are implemented;
+current balance work is focused on improving strategic AI interpretation without
+overtuning starter cards around AI-specific weaknesses.
 
 ## 18. Glossary
 

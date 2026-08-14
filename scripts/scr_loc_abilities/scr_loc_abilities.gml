@@ -36,8 +36,8 @@ function loc_abilities() {
                     cost_cp: 0,
                     cost_exhaust: true,
                     cost_destroy: false,
-                    target_kind: "",
-                    prompt: "",
+                    target_kind: "raided_other_ship",
+                    prompt: "Select another Ship you control that is being raided.",
                     effect_kind: "tyr_raid_support"
                 });
                 break;
@@ -84,6 +84,18 @@ function loc_abilities() {
                     target_kind: "ready_ship",
                     prompt: "Select a ready Ship to receive two Metroids.",
                     effect_kind: "quiet_robe_place"
+                });
+                break;
+
+            case "loc.teleport_station":
+                array_push(_abilities, {
+                    label: "EXHAUST: MOVE METROID",
+                    cost_cp: 0,
+                    cost_exhaust: true,
+                    cost_destroy: false,
+                    target_kind: "ship",
+                    prompt: "Select one of your Ships carrying a Metroid.",
+                    effect_kind: "teleport_metroid"
                 });
                 break;
 
@@ -138,8 +150,8 @@ function loc_abilities() {
                     cost_cp: 3,
                     cost_exhaust: true,
                     cost_destroy: false,
-                    target_kind: "opponent_permanent",
-                    prompt: "Select a permanent your opponent controls to discard.",
+                    target_kind: "mawkin_ship",
+                    prompt: "Select an opposing Ship with Security no greater than Mawkin Starship.",
                     effect_kind: "discard_card"
                 });
                 break;
@@ -347,6 +359,7 @@ function loc_abilities() {
         var _base_kind = string_copy(_source_kind, 1, 9) == "opponent_"
             ? string_delete(_source_kind, 1, 9)
             : _source_kind;
+        if (is_undefined(_card)) return _source_kind;
         return _card.controller == game_state.active_player
             ? _base_kind
             : "opponent_" + _base_kind;
@@ -384,6 +397,15 @@ function loc_abilities() {
         if (_ability.cost_exhaust && !_source.ready) {
             return false;
         }
+        // Attachment abilities move their source onto the chosen card as part
+        // of resolution. If exhausting the source will discard it for Phazon,
+        // there will be nothing left to attach after the cost is paid.
+        if (_ability.cost_exhaust
+        && card_discards_from_phazon(_source)
+        && (_ability.effect_kind == "attach_source"
+            || _ability.effect_kind == "attach_choose_faction")) {
+            return false;
+        }
         if (_controller.command_points < _ability.cost_cp) {
             return false;
         }
@@ -409,6 +431,32 @@ function loc_abilities() {
         && _source.phazon_tokens <= 0) {
             return false;
         }
+        if (_ability.effect_kind == "teleport_metroid") {
+            var _has_teleport_pair = false;
+            for (var _teleport_source_index = 0;
+                 _teleport_source_index < array_length(_controller.board.ships);
+                 _teleport_source_index++) {
+                var _teleport_source =
+                    _controller.board.ships[_teleport_source_index];
+                if (array_length(_teleport_source.cargo) <= 0) continue;
+                for (var _teleport_target_index = 0;
+                     _teleport_target_index
+                        < array_length(_controller.board.ships);
+                     _teleport_target_index++) {
+                    var _teleport_target =
+                        _controller.board.ships[_teleport_target_index];
+                    if (_teleport_target.instance_id
+                    != _teleport_source.instance_id
+                    && card_has_faction(_teleport_target, "CZ")
+                    && array_length(_teleport_target.cargo) < 1) {
+                        _has_teleport_pair = true;
+                        break;
+                    }
+                }
+                if (_has_teleport_pair) break;
+            }
+            if (!_has_teleport_pair) return false;
+        }
         if (_ability.effect_kind == "tyr_raid_support") {
             if (is_undefined(pending_choice)
             || pending_choice.kind != "raid"
@@ -416,9 +464,9 @@ function loc_abilities() {
             || game_state.priority_player != _source.controller) {
                 return false;
             }
+            var _tyr_player = game_state.players[_source.controller];
             var _tyr_defender = raid_get_ship(
-                game_state.players[_source.controller],
-                pending_choice.defender_ship_id
+                _tyr_player, pending_choice.defender_ship_id
             );
             return !is_undefined(_tyr_defender)
                 && _tyr_defender.instance_id != _source.instance_id;
@@ -852,6 +900,17 @@ function loc_abilities() {
                 };
                 return true;
 
+            case "teleport_metroid":
+                pending_choice = {
+                    kind: "teleport_destination",
+                    source: _source,
+                    cargo_ship_id: _target.instance_id,
+                    player_index: _source.controller,
+                    prompt: "Select a different Chozo Ship with space for the Metroid."
+                };
+                game_state.priority_player = _source.controller;
+                return true;
+
             case "exhaust_card":
                 _target.ready = false;
                 array_push(
@@ -887,6 +946,15 @@ function loc_abilities() {
                     game_state.event_log,
                     _source.definition.name + " discarded " + _discarded_name + "."
                 );
+                if (_source.definition_id == "loc.mawkin_starship"
+                && card_is_in_play(_source)) {
+                    _source.phazon_tokens += 2;
+                    array_push(
+                        game_state.event_log,
+                        "Mawkin Starship gained 2 Phazon tokens ("
+                        + string(_source.phazon_tokens) + " total)."
+                    );
+                }
                 return true;
 
             case "dark_samus_discard":
@@ -908,16 +976,12 @@ function loc_abilities() {
                 return true;
 
             case "tyr_raid_support":
-                if (is_undefined(pending_choice)
-                || pending_choice.kind != "raid"
-                || pending_choice.stage != "defenders") {
-                    return false;
-                }
-                var _tyr_target = raid_get_ship(
-                    game_state.players[_source.controller],
-                    pending_choice.defender_ship_id
+                var _tyr_target = get_ability_target_card(
+                    _target_kind, _target_index
                 );
                 if (is_undefined(_tyr_target)
+                || _tyr_target.definition.type != "ship"
+                || _tyr_target.controller != _source.controller
                 || _tyr_target.instance_id == _source.instance_id) {
                     return false;
                 }
@@ -929,7 +993,6 @@ function loc_abilities() {
                         + " for +" + string(_tyr_security)
                         + " Security during the raid."
                 );
-                apply_phazon_interaction(_source, _tyr_target);
                 return true;
 
             case "dark_samus_consolidate":
@@ -1135,6 +1198,12 @@ function loc_abilities() {
         var _source_abilities = get_activated_abilities(_source);
         var _ability = _source_abilities[_ability_index];
         if (_ability.target_kind != "") {
+            var _required_target_instance_id = -1;
+            if (_ability.effect_kind == "tyr_raid_support"
+            && !is_undefined(pending_choice)
+            && pending_choice.kind == "raid") {
+                _required_target_instance_id = pending_choice.defender_ship_id;
+            }
             pending_choice = {
                 kind: "ability_target",
                 source_kind: _source_kind,
@@ -1142,6 +1211,7 @@ function loc_abilities() {
                 source: _source,
                 ability: _ability,
                 target_kind: _ability.target_kind,
+                required_target_instance_id: _required_target_instance_id,
                 prompt: _ability.prompt,
                 multi_select: _ability.effect_kind == "dark_samus_discard",
                 selected_targets: [],
@@ -1173,9 +1243,35 @@ function loc_abilities() {
     can_resolve_ability_target = function(_choice, _target_kind, _target_index) {
         var _target = get_ability_target_card(_target_kind, _target_index);
         if (_choice.target_kind == "ship") {
+            if (_choice.ability.effect_kind == "teleport_metroid") {
+                if (is_undefined(_target)
+                || _target.definition.type != "ship"
+                || _target.controller != _choice.source.controller
+                || array_length(_target.cargo) <= 0) return false;
+                var _teleport_player =
+                    game_state.players[_choice.source.controller];
+                for (var _destination_index = 0;
+                     _destination_index
+                        < array_length(_teleport_player.board.ships);
+                     _destination_index++) {
+                    var _destination =
+                        _teleport_player.board.ships[_destination_index];
+                    if (_destination.instance_id != _target.instance_id
+                    && card_has_faction(_destination, "CZ")
+                    && array_length(_destination.cargo) < 1) return true;
+                }
+                return false;
+            }
             return !is_undefined(_target)
                 && _target.definition.type == "ship"
                 && _target.controller == _choice.source.controller;
+        }
+        if (_choice.target_kind == "raided_other_ship") {
+            return !is_undefined(_target)
+                && _target.definition.type == "ship"
+                && _target.controller == _choice.source.controller
+                && _target.instance_id != _choice.source.instance_id
+                && _target.instance_id == _choice.required_target_instance_id;
         }
         if (_choice.target_kind == "ready_ship") {
             return !is_undefined(_target)
@@ -1267,6 +1363,12 @@ function loc_abilities() {
         if (_choice.target_kind == "opponent_permanent") {
             return !is_undefined(_target)
                 && _target.controller != _choice.source.controller;
+        }
+        if (_choice.target_kind == "mawkin_ship") {
+            return _target_kind == "opponent_ship"
+                && !is_undefined(_target)
+                && _target.controller != _choice.source.controller
+                && get_card_stat(_target) <= get_card_stat(_choice.source);
         }
         return false;
     };
@@ -1470,6 +1572,51 @@ function loc_abilities() {
             ) || _resolved;
         }
         return _resolved;
+    };
+
+    resolve_teleport_destination_choice = function(
+        _target_kind,
+        _target_index
+    ) {
+        if (is_undefined(pending_choice)
+        || pending_choice.kind != "teleport_destination") return false;
+        var _choice = pending_choice;
+        var _player = game_state.players[_choice.player_index];
+        var _cargo_ship_index = raid_find_instance_index(
+            _player.board.ships,
+            _choice.cargo_ship_id
+        );
+        var _destination = get_ability_target_card(
+            _target_kind,
+            _target_index
+        );
+        if (_cargo_ship_index < 0
+        || is_undefined(_destination)
+        || _destination.definition.type != "ship"
+        || _destination.controller != _choice.player_index
+        || _destination.instance_id == _choice.cargo_ship_id
+        || !card_has_faction(_destination, "CZ")
+        || array_length(_destination.cargo) >= 1) return false;
+        var _cargo_ship = _player.board.ships[_cargo_ship_index];
+        if (array_length(_cargo_ship.cargo) <= 0) return false;
+        apply_phazon_interaction(_choice.source, _destination);
+        var _metroid = _cargo_ship.cargo[0];
+        array_delete(_cargo_ship.cargo, 0, 1);
+        _metroid.zone = "ship";
+        _metroid.host_ship_instance_id = _destination.instance_id;
+        array_push(_destination.cargo, _metroid);
+        _choice.source.phazon_tokens += 1;
+        array_push(
+            game_state.event_log,
+            "Teleport Station moved " + _metroid.definition.name
+            + " from " + _cargo_ship.definition.name + " to "
+            + _destination.definition.name + " and gained a Phazon token ("
+            + string(_choice.source.phazon_tokens) + " total)."
+        );
+        pending_choice = undefined;
+        ui_selected_kind = "";
+        ui_selected_index = -1;
+        return true;
     };
 
     resolve_space_pirate_payment = function(_pay) {

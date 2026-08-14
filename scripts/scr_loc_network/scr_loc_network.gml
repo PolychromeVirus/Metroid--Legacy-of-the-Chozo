@@ -34,6 +34,41 @@ function loc_network() {
         return true;
     };
 
+    append_network_chat_message = function(_participant_id, _message) {
+        var _index = network_find_participant(_participant_id);
+        if (_index < 0) return false;
+        var _participant = net_lobby_participants[_index];
+        var _clean_message = string_copy(string_trim(string(_message)), 1, 200);
+        if (_clean_message == "") return false;
+        var _name = string(_participant.name);
+        var _color = _participant.seat >= 0
+            ? get_player_chat_color(_participant.seat)
+            : LOC_COLOR_NEUTRAL;
+        array_push(game_state.event_log, {
+            kind: "chat",
+            text: _name + ": " + _clean_message,
+            name_text: _name + ":",
+            name_color: _color
+        });
+        event_log_scroll = 0;
+        return true;
+    };
+
+    append_spectator_chat_message = function(_name, _message) {
+        var _clean_message = string_copy(string_trim(string(_message)), 1, 200);
+        if (_clean_message == "") return false;
+        var _spectator_name = string_trim(string(_name));
+        if (_spectator_name == "") _spectator_name = "Spectator";
+        array_push(game_state.event_log, {
+            kind: "chat",
+            text: _spectator_name + ": " + _clean_message,
+            name_text: _spectator_name + ":",
+            name_color: LOC_COLOR_NEUTRAL
+        });
+        event_log_scroll = 0;
+        return true;
+    };
+
     submit_chat_message = function(_message) {
         var _sender = game_state.game_mode == "network"
             ? network_local_player
@@ -41,15 +76,32 @@ function loc_network() {
                 ? game_state.active_player
                 : game_state.view_player);
         var _clean_message = string_copy(string_trim(string(_message)), 1, 200);
-        if (!append_chat_message(_sender, _clean_message)) {
+        var _chat_appended;
+        if (game_state.game_mode == "network") {
+            _chat_appended = append_network_chat_message(
+                net_local_participant_id, _clean_message
+            );
+        } else if (game_state.game_mode == "ai_watch") {
+            _chat_appended = append_spectator_chat_message(
+                net_player_name, _clean_message
+            );
+        } else {
+            _chat_appended = append_chat_message(_sender, _clean_message);
+        }
+        if (!_chat_appended) {
             return false;
         }
         if (game_state.game_mode == "network") {
-            var _socket = net_role == "host" ? net_peer_socket : net_socket;
-            network_send_message(_socket, {
+            var _chat_packet = {
                 type: "chat_message",
+                sender_id: net_local_participant_id,
                 message: _clean_message
-            });
+            };
+            if (net_role == "host") {
+                network_broadcast(_chat_packet);
+            } else {
+                network_send_message(net_socket, _chat_packet);
+            }
         }
         return true;
     };
@@ -74,6 +126,120 @@ function loc_network() {
         return _sent >= 0;
     };
 
+    network_broadcast = function(_message, _except_socket) {
+        var _sent_any = false;
+        for (var _socket_index = 0;
+             _socket_index < array_length(net_client_sockets);
+             _socket_index++) {
+            var _client_socket = net_client_sockets[_socket_index];
+            if (_client_socket >= 0
+            && (is_undefined(_except_socket)
+                || _client_socket != _except_socket)) {
+                _sent_any = network_send_message(_client_socket, _message)
+                    || _sent_any;
+            }
+        }
+        return _sent_any;
+    };
+
+    network_lobby_public_state = function() {
+        var _result = [];
+        for (var _index = 0;
+             _index < array_length(net_lobby_participants);
+             _index++) {
+            var _participant = net_lobby_participants[_index];
+            array_push(_result, {
+                id: _participant.id,
+                name: _participant.name,
+                seat: _participant.seat,
+                leader_id: _participant.leader_id,
+                ready: _participant.ready,
+                host: _participant.host
+            });
+        }
+        return _result;
+    };
+
+    network_broadcast_lobby = function() {
+        var _state = network_lobby_public_state();
+        network_broadcast({type: "lobby_state", participants: _state});
+        return _state;
+    };
+
+    network_find_participant = function(_participant_id) {
+        for (var _index = 0;
+             _index < array_length(net_lobby_participants);
+             _index++) {
+            if (net_lobby_participants[_index].id == _participant_id) {
+                return _index;
+            }
+        }
+        return -1;
+    };
+
+    network_find_participant_by_socket = function(_socket) {
+        for (var _index = 0;
+             _index < array_length(net_lobby_participants);
+             _index++) {
+            var _participant = net_lobby_participants[_index];
+            if (variable_struct_exists(_participant, "socket")
+            && _participant.socket == _socket) return _index;
+        }
+        return -1;
+    };
+
+    network_lobby_apply_action = function(_participant_id, _action, _value) {
+        if (net_role != "host") return false;
+        var _index = network_find_participant(_participant_id);
+        if (_index < 0) return false;
+        var _participant = net_lobby_participants[_index];
+        switch (_action) {
+            case "claim_seat":
+                var _seat = floor(real(_value));
+                if (_seat < 0 || _seat >= net_lobby_seat_count) return false;
+                for (var _seat_check = 0;
+                     _seat_check < array_length(net_lobby_participants);
+                     _seat_check++) {
+                    if (_seat_check != _index
+                    && net_lobby_participants[_seat_check].seat == _seat) {
+                        return false;
+                    }
+                }
+                _participant.seat = _seat;
+                _participant.ready = false;
+                break;
+            case "spectate":
+                _participant.seat = -1;
+                _participant.ready = false;
+                break;
+            case "toggle_ready":
+                if (_participant.seat < 0) return false;
+                _participant.ready = !_participant.ready;
+                break;
+            case "set_leader":
+                _participant.leader_id = resolve_leader_identity_id(
+                    string(_value)
+                );
+                _participant.ready = false;
+                break;
+            default: return false;
+        }
+        net_lobby_participants[_index] = _participant;
+        network_broadcast_lobby();
+        return true;
+    };
+
+    network_lobby_submit_action = function(_action, _value) {
+        if (net_role == "host") {
+            return network_lobby_apply_action(
+                net_local_participant_id, _action, _value
+            );
+        }
+        return network_send_message(net_socket, {
+            type: "lobby_action", action: _action, value: _value
+        });
+    };
+
     network_begin_host = function() {
         global.loc_player_name = net_player_name;
         net_leader_id = resolve_leader_identity_id(
@@ -81,15 +247,26 @@ function loc_network() {
         );
         net_role = "host";
         net_status = "Opening host on port " + string(net_port) + "...";
-        net_server = network_create_server(network_socket_tcp, net_port, 1);
+        net_server = network_create_server(network_socket_tcp, net_port, 7);
         if (net_server < 0) {
             net_status = "Could not open port " + string(net_port) + ".";
             return false;
         }
         title_menu_active = false;
         network_lobby_active = true;
-        net_status = "Waiting for Player 2 on port "
-            + string(net_port) + "...";
+        net_client_sockets = [];
+        net_local_participant_id = 0;
+        net_next_participant_id = 1;
+        net_lobby_participants = [{
+            id: 0,
+            name: net_player_name,
+            seat: 0,
+            leader_id: net_leader_id,
+            ready: false,
+            host: true,
+            socket: -1
+        }];
+        net_status = "Lobby open on port " + string(net_port) + ".";
         show_debug_message("[NET] " + net_status);
         return true;
     };
@@ -103,6 +280,8 @@ function loc_network() {
         net_status = "Enter the host address.";
         title_menu_active = false;
         network_lobby_active = true;
+        net_local_participant_id = -1;
+        net_lobby_participants = [];
         net_join_field = "address";
         keyboard_string = net_ip_input;
         return true;
@@ -130,13 +309,59 @@ function loc_network() {
         return true;
     };
 
-    network_prepare_match_restart = function(_role, _socket, _server, _seed) {
+    network_prepare_match_restart = function(
+        _role, _socket, _server, _seed, _breaching_mutation,
+        _loaded_ships_exhausted
+    ) {
         global.loc_test_seed = _seed;
         global.loc_network_resume = true;
         global.loc_network_role = _role;
         global.loc_network_socket = _socket;
         global.loc_network_server = _server;
+        global.loc_network_client_sockets = net_client_sockets;
+        global.loc_network_participant_id = net_local_participant_id;
+        global.loc_network_breaching_mutation = _breaching_mutation;
+        global.loc_network_loaded_ships_exhausted = _loaded_ships_exhausted;
+        global.loc_network_lobby_snapshot = net_role == "host"
+            ? net_lobby_participants
+            : network_lobby_public_state();
         room_restart();
+    };
+
+    network_start_lobby_match = function() {
+        if (net_role != "host") return false;
+        var _occupied = [false, false];
+        var _ready = [false, false];
+        for (var _index = 0;
+             _index < array_length(net_lobby_participants);
+             _index++) {
+            var _participant = net_lobby_participants[_index];
+            if (_participant.seat >= 0 && _participant.seat < 2) {
+                _occupied[_participant.seat] = true;
+                _ready[_participant.seat] = _participant.ready;
+            }
+        }
+        if (!_occupied[0] || !_occupied[1] || !_ready[0] || !_ready[1]) {
+            net_status = "Both player seats must be occupied and ready.";
+            return false;
+        }
+        randomize();
+        var _seed = irandom(2147483646);
+        network_broadcast({
+            type: "start_match",
+            protocol: 3,
+            seed: _seed,
+            breaching_mutation: settings_experimental_breaching_mutation,
+            loaded_ships_exhausted:
+                settings_experimental_loaded_ships_exhausted,
+            participants: network_lobby_public_state()
+        });
+        network_prepare_match_restart(
+            "host", -1, net_server, _seed,
+            settings_experimental_breaching_mutation,
+            settings_experimental_loaded_ships_exhausted
+        );
+        return true;
     };
 
     network_expected_player = function() {
@@ -168,7 +393,10 @@ function loc_network() {
                     if (_kind != "hand") return false;
                     return resolve_researcher_discard(_index);
                 case "raid":
-                    if (pending_choice.stage == "target") {
+                    if (pending_choice.stage == "attacker_ship") {
+                        if (_kind != "ship") return false;
+                        return select_raid_attacker(_index);
+                    } else if (pending_choice.stage == "target") {
                         return select_raid_target(_index);
                     }
                     return select_raid_ability_source(_kind, _index);
@@ -213,7 +441,29 @@ function loc_network() {
             return false;
         }
 
+        if (string_pos("back_in_day_pick_", _input.action) == 1) {
+            var _back_pick_text = string_delete(
+                _input.action,
+                1,
+                string_length("back_in_day_pick_")
+            );
+            return resolve_back_in_the_day_choice(real(_back_pick_text));
+        }
+        if (string_pos("raid_target_", _input.action) == 1) {
+            var _raid_target_text = string_delete(
+                _input.action,
+                1,
+                string_length("raid_target_")
+            );
+            return begin_raid_target_choice(real(_raid_target_text));
+        }
         switch (_input.action) {
+            case "back_in_day_prev":
+                pending_choice.page = max(0, pending_choice.page - 1);
+                return true;
+            case "back_in_day_next":
+                pending_choice.page += 1;
+                return true;
             case "advance_phase": return advance_game_phase();
             case "containment_no_ship": return resolve_turn_containment(-1);
             case "containment_use_ship":
@@ -297,6 +547,10 @@ function loc_network() {
     };
 
     network_submit_input = function(_input) {
+        if (network_local_player < 0) {
+            show_debug_message("[NET] Spectators cannot submit game input.");
+            return false;
+        }
         if (network_local_player != network_expected_player()) {
             show_debug_message("[NET] Ignored out-of-priority local input.");
             return false;
@@ -305,7 +559,7 @@ function loc_network() {
             net_command_sequence += 1;
             _input.type = "command_commit";
             _input.sequence = net_command_sequence;
-            network_send_message(net_peer_socket, _input);
+            network_broadcast(_input);
             return network_execute_input(_input);
         }
         _input.type = "command_request";

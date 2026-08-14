@@ -203,43 +203,143 @@ function loc_step() {
         board_camera_drag_last_y = _ui_pointer_y;
     }
 
-    // Close framing follows the current player. Any interaction that can require
-    // looking across the table temporarily escalates to the same complete-table
-    // framing used by the explicit Far mode.
-    var _camera_cross_player_interaction = game_state.priority_player
-        != game_state.active_player;
+    // Close framing follows the zone currently asking for input. Cross-table
+    // interactions no longer default to Far when their legal targets occupy one
+    // known board row.
+    var _camera_cross_player_interaction = false;
+    var _camera_focus_player = -1;
+    var _camera_focus_zone = "";
     if (!is_undefined(pending_choice)) {
         _camera_cross_player_interaction = _camera_cross_player_interaction
             || pending_choice.kind == "raid"
             || pending_choice.kind == "raid_cargo";
-        if (pending_choice.kind == "ability_target"
+        if (pending_choice.kind == "raid"
+        && pending_choice.stage == "attacker_ship") {
+            _camera_focus_player = game_state.active_player;
+            _camera_focus_zone = "ship";
+        } else if (pending_choice.kind == "chozo_ghosts_source") {
+            _camera_focus_player = pending_choice.player_index;
+            _camera_focus_zone = "all";
+        } else if (pending_choice.kind == "chozo_ghosts_target") {
+            _camera_focus_player = pending_choice.target_player_index;
+            _camera_focus_zone = "character";
+        } else if (pending_choice.kind == "ability_target"
         && variable_struct_exists(pending_choice, "target_kind")) {
             var _camera_target_kind = pending_choice.target_kind;
-            _camera_cross_player_interaction =
-                _camera_cross_player_interaction
-                || _camera_target_kind == "any_ship"
+            if (_camera_target_kind == "ship"
+            || _camera_target_kind == "ready_ship"
+            || _camera_target_kind == "raided_other_ship") {
+                _camera_focus_player = pending_choice.source.controller;
+                _camera_focus_zone = "ship";
+            } else if (_camera_target_kind == "opponent_character") {
+                _camera_focus_player = 1 - pending_choice.source.controller;
+                _camera_focus_zone = "character";
+            } else if (_camera_target_kind == "opponent_permanent") {
+                _camera_focus_player = 1 - pending_choice.source.controller;
+                _camera_focus_zone = "all";
+            } else {
+                _camera_cross_player_interaction =
+                    _camera_target_kind == "any_ship"
                 || _camera_target_kind == "any_character"
                 || _camera_target_kind == "dark_samus_character"
                 || _camera_target_kind == "any_location"
                 || _camera_target_kind == "another_character"
                 || _camera_target_kind == "another_permanent"
-                || _camera_target_kind == "opponent_character"
-                || _camera_target_kind == "opponent_permanent";
+                    || _camera_cross_player_interaction;
+            }
         }
     }
+    var _camera_target_side = _camera_focus_player < 0
+        ? ""
+        : (_camera_focus_player == game_state.view_player
+            ? "local" : "opponent");
     var _camera_auto_focus = board_camera_center_far
         ? "far"
-        : (_camera_cross_player_interaction
+        : (_camera_focus_zone != ""
+            ? "target_" + _camera_target_side + "_" + _camera_focus_zone
+            : (_camera_cross_player_interaction
             ? "far_interaction"
             : (game_state.active_player == game_state.view_player
                 ? "local"
-                : "opponent"));
+                : "opponent")));
     if (_camera_input_allowed
     && board_camera_auto_center
     && (board_camera_locked || board_camera_recenter_requested)
     && board_camera_last_auto_focus != _camera_auto_focus) {
         board_camera_last_auto_focus = _camera_auto_focus;
-        if (_camera_auto_focus == "far"
+        if (string_pos("target_", _camera_auto_focus) == 1) {
+            var _focus_margin = 19;
+            var _focus_header = 48;
+            var _focus_gap = 10;
+            var _focus_content_top = _focus_header + 8;
+            var _focus_shared_h = floor(board_layout_height * 0.22);
+            var _focus_shared_top = _focus_content_top
+                + floor(board_layout_height * 0.17) + _focus_gap;
+            var _focus_shared_bottom = _focus_shared_top + _focus_shared_h;
+            var _focus_board_top = _focus_shared_bottom + _focus_gap;
+            var _focus_board_bottom = board_layout_height - _focus_margin;
+            var _focus_board_h = _focus_board_bottom - _focus_board_top;
+            var _focus_opponent_bottom = _focus_shared_top - _focus_gap;
+            var _focus_opponent_top = _focus_opponent_bottom - _focus_board_h;
+            var _focus_local = _camera_target_side == "local";
+            var _focus_play_top = (_focus_local
+                ? _focus_board_top : _focus_opponent_top) + 54;
+            var _focus_play_bottom = (_focus_local
+                ? _focus_board_bottom : _focus_opponent_bottom) - 38;
+            var _focus_card_w = _camera_focus_zone == "ship" ? 184 : 116;
+            var _focus_card_h = _camera_focus_zone == "ship" ? 132 : 162;
+            var _focus_cards = _camera_focus_player >= 0
+                ? (_camera_focus_zone == "ship"
+                    ? game_state.players[_camera_focus_player].board.ships
+                    : game_state.players[_camera_focus_player].board.characters)
+                : [];
+            var _focus_count = array_length(_focus_cards);
+            var _focus_zone_w;
+            var _focus_zone_h;
+            var _focus_center_x = board_camera_world_width * 0.5;
+            var _focus_center_y;
+            if (_camera_focus_zone == "all") {
+                _focus_zone_w = board_camera_world_width - 70;
+                _focus_zone_h = _focus_play_bottom - _focus_play_top;
+                _focus_center_y = (_focus_play_top + _focus_play_bottom) * 0.5;
+            } else {
+                _focus_zone_w = _focus_card_w
+                    + (max(0, _focus_count - 1) * (_focus_card_w + 10));
+                _focus_zone_w = min(
+                    board_camera_world_width - 70, _focus_zone_w
+                );
+                _focus_zone_h = _focus_card_h;
+                if (_camera_focus_zone == "ship") {
+                    _focus_center_y = _focus_local
+                        ? _focus_play_top + 8 + (_focus_card_h * 0.5)
+                        : _focus_play_bottom - 8 - (_focus_card_h * 0.5);
+                } else {
+                    _focus_center_y = _focus_local
+                        ? _focus_play_bottom - 8 - (_focus_card_h * 0.5)
+                        : _focus_play_top + 8 + (_focus_card_h * 0.5);
+                }
+            }
+            var _focus_screen_h = ui_screen_height - board_viewport_top;
+            board_camera_target_zoom = clamp(
+                min(
+                    1.45,
+                    (board_viewport_right * 0.88)
+                        / max(1, _focus_zone_w + 80),
+                    (_focus_screen_h * 0.58)
+                        / max(1, _focus_zone_h + 60)
+                ),
+                board_camera_min_zoom,
+                board_camera_max_zoom
+            );
+            var _focus_visible_w = board_viewport_right
+                / board_camera_target_zoom;
+            board_camera_target_x = _focus_center_x - (_focus_visible_w * 0.5);
+            var _focus_desired_screen_y = board_viewport_top
+                + (_focus_screen_h * 0.63);
+            board_camera_target_y = _focus_center_y
+                - ((_focus_desired_screen_y - board_viewport_top)
+                    / board_camera_target_zoom);
+        } else if (_camera_auto_focus == "far"
         || _camera_auto_focus == "far_interaction") {
             board_camera_target_zoom = clamp(
                 min(
@@ -394,9 +494,8 @@ function loc_step() {
     board_camera_x = lerp(board_camera_x, board_camera_target_x, 0.22);
     board_camera_y = lerp(board_camera_y, board_camera_target_y, 0.22);
 
-    // Persist newly generated match events before any controller branch can exit
-    // this Step. A crash therefore retains everything flushed through the prior
-    // completed update.
+    // Merge newly generated events into the ordered in-memory journal before a
+    // controller branch can exit this Step. Completed matches flush it once.
     if (!title_menu_active
     && (game_state.game_mode != "batch"
         || global.loc_batch_state.detailed_logs
@@ -925,8 +1024,19 @@ function loc_step() {
                     if (net_server >= 0) {
                         network_destroy(net_server);
                     }
+                    for (var _pause_socket_index = 0;
+                         _pause_socket_index < array_length(net_client_sockets);
+                         _pause_socket_index++) {
+                        if (net_client_sockets[_pause_socket_index] >= 0) {
+                            network_destroy(net_client_sockets[
+                                _pause_socket_index
+                            ]);
+                        }
+                    }
                     net_socket = -1;
                     net_server = -1;
+                    net_client_sockets = [];
+                    net_lobby_participants = [];
                     net_role = "";
                     net_status = "";
                     network_lobby_active = false;
@@ -974,6 +1084,49 @@ function loc_step() {
                 save_persistent_settings();
                 network_connect_to_host();
             } else if (_hover_region.kind == "action"
+            && string_pos("network_lobby_claim_", _hover_region.action) == 1) {
+                var _claim_text = string_delete(
+                    _hover_region.action, 1,
+                    string_length("network_lobby_claim_")
+                );
+                network_lobby_submit_action("claim_seat", real(_claim_text));
+            } else if (_hover_region.kind == "action"
+            && _hover_region.action == "network_lobby_spectate") {
+                network_lobby_submit_action("spectate", -1);
+            } else if (_hover_region.kind == "action"
+            && _hover_region.action == "network_lobby_ready") {
+                network_lobby_submit_action("toggle_ready", 0);
+            } else if (_hover_region.kind == "action"
+            && _hover_region.action == "network_lobby_leader") {
+                var _lobby_leaders = [
+                    "bsl_researcher", "adam_malkovich", "mother_brain",
+                    "quiet_robe", "raven_beak"
+                ];
+                var _lobby_local = network_find_participant(
+                    net_local_participant_id
+                );
+                if (_lobby_local >= 0) {
+                    var _current_leader = net_lobby_participants[
+                        _lobby_local
+                    ].leader_id;
+                    var _next_leader_index = 0;
+                    for (var _leader_scan = 0;
+                         _leader_scan < array_length(_lobby_leaders);
+                         _leader_scan++) {
+                        if (_lobby_leaders[_leader_scan] == _current_leader) {
+                            _next_leader_index = (_leader_scan + 1)
+                                mod array_length(_lobby_leaders);
+                            break;
+                        }
+                    }
+                    network_lobby_submit_action(
+                        "set_leader", _lobby_leaders[_next_leader_index]
+                    );
+                }
+            } else if (_hover_region.kind == "action"
+            && _hover_region.action == "network_lobby_start") {
+                network_start_lobby_match();
+            } else if (_hover_region.kind == "action"
             && _hover_region.action == "network_back") {
                 if (net_socket >= 0) {
                     network_destroy(net_socket);
@@ -981,8 +1134,19 @@ function loc_step() {
                 if (net_server >= 0) {
                     network_destroy(net_server);
                 }
+                for (var _lobby_socket_index = 0;
+                     _lobby_socket_index < array_length(net_client_sockets);
+                     _lobby_socket_index++) {
+                    if (net_client_sockets[_lobby_socket_index] >= 0) {
+                        network_destroy(net_client_sockets[
+                            _lobby_socket_index
+                        ]);
+                    }
+                }
                 net_socket = -1;
                 net_server = -1;
+                net_client_sockets = [];
+                net_lobby_participants = [];
                 network_lobby_active = false;
                 title_menu_active = true;
                 title_name_editing = false;
@@ -993,6 +1157,42 @@ function loc_step() {
     }
 
     if (title_menu_active) {
+        if (title_context_mode == "settings") {
+            var _settings_wheel_delta =
+                mouse_wheel_down() - mouse_wheel_up();
+            var _settings_panel_w = min(1240, ui_screen_width - 48);
+            var _settings_panel_h = min(700, ui_screen_height - 96);
+            var _settings_panel_x = floor(
+                (ui_screen_width - _settings_panel_w) * 0.5
+            );
+            var _settings_panel_y = floor(
+                (ui_screen_height - _settings_panel_h) * 0.5
+            );
+            var _settings_right_x = _settings_panel_x + 42 + 260 + 34;
+            var _settings_available_w =
+                _settings_panel_x + _settings_panel_w - 42
+                - _settings_right_x;
+            var _settings_control_w = min(
+                430,
+                max(260, floor((_settings_available_w - 34) * 0.58))
+            );
+            var _settings_right_edge = _settings_right_x
+                + _settings_control_w + 14;
+            var _settings_view_top = _settings_panel_y + 240;
+            var _settings_view_bottom =
+                _settings_panel_y + _settings_panel_h - 48;
+            if (_settings_wheel_delta != 0
+            && _ui_pointer_x >= _settings_right_x
+            && _ui_pointer_x <= _settings_right_edge
+            && _ui_pointer_y >= _settings_view_top
+            && _ui_pointer_y <= _settings_view_bottom) {
+                title_settings_scroll = clamp(
+                    title_settings_scroll + (_settings_wheel_delta * 42),
+                    0,
+                    title_settings_scroll_max
+                );
+            }
+        }
         if (title_name_editing == 1) {
             var _title_edited_name = string_copy(keyboard_string, 1, 24);
             if (_title_edited_name != net_player_name) {
@@ -1100,6 +1300,16 @@ function loc_step() {
                 } else if (_hover_region.action
                 == "settings_restore_guidance") {
                     restore_first_game_guidance();
+                } else if (_hover_region.action
+                == "settings_breaching_mutation") {
+                    settings_experimental_breaching_mutation =
+                        !settings_experimental_breaching_mutation;
+                    save_persistent_settings();
+                } else if (_hover_region.action
+                == "settings_loaded_ships_exhausted") {
+                    settings_experimental_loaded_ships_exhausted =
+                        !settings_experimental_loaded_ships_exhausted;
+                    save_persistent_settings();
                 } else if (_hover_region.action == "settings_back") {
                     settings_menu_active = false;
                 } else if (_hover_region.action == "title_hotseat") {
@@ -1131,10 +1341,17 @@ function loc_step() {
                     batch_game_option_index = (
                         batch_game_option_index + 1
                     ) mod array_length(batch_game_options);
+                } else if (_hover_region.action == "batch_cycle_matrix_filter") {
+                    batch_matrix_filter_index = (
+                        batch_matrix_filter_index + 1
+                    ) mod array_length(batch_matrix_filter_options);
+                } else if (_hover_region.action == "batch_toggle_drafting") {
+                    batch_focused_drafting = !batch_focused_drafting;
                 } else if (_hover_region.action == "batch_toggle_logs") {
                     batch_detailed_logs = !batch_detailed_logs;
                 } else if (_hover_region.action == "batch_toggle_report_value") {
-                    batch_report_show_counts = !batch_report_show_counts;
+                    batch_report_raw_win_rate =
+                        !batch_report_raw_win_rate;
                 } else if (_hover_region.action == "batch_report_previous") {
                     batch_report_page = (
                         batch_report_page + array_length(batch_profile_options)
@@ -1146,6 +1363,8 @@ function loc_step() {
                     start_batch_run(false);
                 } else if (_hover_region.action == "batch_run_matrix") {
                     start_batch_run(true);
+                } else if (_hover_region.action == "batch_resume_checkpoint") {
+                    batch_resume_checkpoint();
                 } else if (_hover_region.action == "batch_back") {
                     batch_menu_active = false;
                     if (variable_global_exists("loc_batch_show_results")) {
@@ -1317,13 +1536,29 @@ function loc_step() {
         }
     }
 
+    var _spectator_hand_peek_target = (
+        game_state.game_mode == "ai_watch"
+        || (game_state.game_mode == "network" && network_local_player < 0)
+    )
+        && spectator_hands_visible ? 1 : 0;
+    spectator_hand_peek_amount = lerp(
+        spectator_hand_peek_amount,
+        _spectator_hand_peek_target,
+        0.16
+    );
+    if (abs(spectator_hand_peek_amount - _spectator_hand_peek_target) < 0.005) {
+        spectator_hand_peek_amount = _spectator_hand_peek_target;
+    }
+
     // Camera, Lab, and test controls remain local presentation controls even while
     // an AI owns every gameplay decision.
     if (mouse_check_button_pressed(mb_left)
     && !is_undefined(_hover_region)
     && ((_hover_region.kind == "action"
-            && (_hover_region.action == "camera_center_toggle"
-                || _hover_region.action == "camera_lock_toggle"
+             && (_hover_region.action == "camera_center_toggle"
+                 || _hover_region.action == "camera_lock_toggle"
+                 || _hover_region.action == "spectator_view_toggle"
+                 || _hover_region.action == "spectator_hands_toggle"
                 || (game_state.game_mode != "network"
                     && string_pos("test_", _hover_region.action) == 1)))
         || _hover_region.kind == "lab_tab"
@@ -1342,6 +1577,15 @@ function loc_step() {
             ui_selected_instance_id = -1;
         } else if (string_pos("test_", _hover_region.action) == 1) {
             handle_test_tool_action(_hover_region.action);
+        } else if (_hover_region.action == "spectator_view_toggle") {
+            game_state.view_player = 1 - game_state.view_player;
+            ui_selected_kind = "";
+            ui_selected_index = -1;
+            ui_selected_instance_id = -1;
+            board_camera_last_auto_focus = "";
+            board_camera_recenter_requested = true;
+        } else if (_hover_region.action == "spectator_hands_toggle") {
+            spectator_hands_visible = !spectator_hands_visible;
         } else if (_hover_region.action == "camera_center_toggle") {
             board_camera_center_far = !board_camera_center_far;
             board_camera_last_auto_focus = "";
@@ -1391,6 +1635,7 @@ function loc_step() {
     // Human responses to an explicit pending choice remain legal; otherwise only
     // the two camera buttons consume clicks.
     var _gameplay_input_locked = game_state.game_mode == "ai_watch"
+        || (game_state.game_mode == "network" && network_local_player < 0)
         || game_state.players[game_state.view_player].is_ai
         || (
             game_state.active_player != game_state.view_player
@@ -1488,7 +1733,21 @@ function loc_step() {
                     ui_selected_kind = _hover_region.context_kind;
                     ui_selected_index = _hover_region.context_index;
                 }
-                switch (_hover_region.action) {
+                if (string_pos("back_in_day_pick_", _hover_region.action) == 1) {
+                    var _back_pick_text = string_delete(
+                        _hover_region.action,
+                        1,
+                        string_length("back_in_day_pick_")
+                    );
+                    resolve_back_in_the_day_choice(real(_back_pick_text));
+                } else if (string_pos("raid_target_", _hover_region.action) == 1) {
+                    var _raid_target_text = string_delete(
+                        _hover_region.action,
+                        1,
+                        string_length("raid_target_")
+                    );
+                    begin_raid_target_choice(real(_raid_target_text));
+                } else switch (_hover_region.action) {
                     case "advance_phase":
                         advance_game_phase();
                         break;
@@ -1543,6 +1802,14 @@ function loc_step() {
                         begin_raid_choice(ui_selected_index);
                         break;
 
+                    case "back_in_day_prev":
+                        pending_choice.page = max(0, pending_choice.page - 1);
+                        break;
+
+                    case "back_in_day_next":
+                        pending_choice.page += 1;
+                        break;
+
                     case "salvage":
                         salvage_permanent(ui_selected_kind, ui_selected_index);
                         break;
@@ -1593,35 +1860,74 @@ function loc_step() {
                         break;
 
                     case "raid_use_0":
+                        var _raid_use_0_kind = variable_struct_exists(
+                            _hover_region, "context_kind"
+                        ) ? _hover_region.context_kind : ui_selected_kind;
+                        var _raid_use_0_index = variable_struct_exists(
+                            _hover_region, "context_index"
+                        ) ? _hover_region.context_index : ui_selected_index;
+                        var _raid_use_0_source = variable_struct_exists(
+                            _hover_region, "context_instance"
+                        ) && !is_undefined(_hover_region.context_instance)
+                            ? _hover_region.context_instance
+                            : get_ability_source(
+                                _raid_use_0_kind, _raid_use_0_index
+                            );
                         activate_raid_ability_index(
                             0,
                             get_raid_source_kind(
-                                ui_selected_kind,
-                                get_ability_source(ui_selected_kind, ui_selected_index)
+                                _raid_use_0_kind,
+                                _raid_use_0_source
                             ),
-                            ui_selected_index
+                            _raid_use_0_index
                         );
                         break;
 
                     case "raid_use_1":
+                        var _raid_use_1_kind = variable_struct_exists(
+                            _hover_region, "context_kind"
+                        ) ? _hover_region.context_kind : ui_selected_kind;
+                        var _raid_use_1_index = variable_struct_exists(
+                            _hover_region, "context_index"
+                        ) ? _hover_region.context_index : ui_selected_index;
+                        var _raid_use_1_source = variable_struct_exists(
+                            _hover_region, "context_instance"
+                        ) && !is_undefined(_hover_region.context_instance)
+                            ? _hover_region.context_instance
+                            : get_ability_source(
+                                _raid_use_1_kind, _raid_use_1_index
+                            );
                         activate_raid_ability_index(
                             1,
                             get_raid_source_kind(
-                                ui_selected_kind,
-                                get_ability_source(ui_selected_kind, ui_selected_index)
+                                _raid_use_1_kind,
+                                _raid_use_1_source
                             ),
-                            ui_selected_index
+                            _raid_use_1_index
                         );
                         break;
 
                     case "raid_use_2":
+                        var _raid_use_2_kind = variable_struct_exists(
+                            _hover_region, "context_kind"
+                        ) ? _hover_region.context_kind : ui_selected_kind;
+                        var _raid_use_2_index = variable_struct_exists(
+                            _hover_region, "context_index"
+                        ) ? _hover_region.context_index : ui_selected_index;
+                        var _raid_use_2_source = variable_struct_exists(
+                            _hover_region, "context_instance"
+                        ) && !is_undefined(_hover_region.context_instance)
+                            ? _hover_region.context_instance
+                            : get_ability_source(
+                                _raid_use_2_kind, _raid_use_2_index
+                            );
                         activate_raid_ability_index(
                             2,
                             get_raid_source_kind(
-                                ui_selected_kind,
-                                get_ability_source(ui_selected_kind, ui_selected_index)
+                                _raid_use_2_kind,
+                                _raid_use_2_source
                             ),
-                            ui_selected_index
+                            _raid_use_2_index
                         );
                         break;
 
@@ -1787,6 +2093,11 @@ function loc_step() {
                 ui_context_preview_until_ms = 0;
             }
         } else if (!is_undefined(pending_choice)
+        && pending_choice.kind == "raid"
+        && pending_choice.stage == "attacker_ship"
+        && _hover_region.kind == "ship") {
+            select_raid_attacker(_hover_region.index);
+        } else if (!is_undefined(pending_choice)
         && pending_choice.kind == "hand_refresh"
         && _hover_region.kind == "hand") {
             toggle_hand_refresh_card(_hover_region.index);
@@ -1881,13 +2192,33 @@ function loc_step() {
             );
         } else if (!is_undefined(pending_choice)
         && pending_choice.kind == "ability_target") {
+            var _ability_target_kind = _hover_region.kind;
+            if (!is_undefined(_hover_region.instance)
+            && (_hover_region.kind == "character"
+                || _hover_region.kind == "ship"
+                || _hover_region.kind == "location"
+                || _hover_region.kind == "opponent_character"
+                || _hover_region.kind == "opponent_ship"
+                || _hover_region.kind == "opponent_location")) {
+                _ability_target_kind = get_raid_source_kind(
+                    _hover_region.kind, _hover_region.instance
+                );
+            }
             if (resolve_ability_target_choice(
-                _hover_region.kind,
+                _ability_target_kind,
                 _hover_region.index
             )) {
                 ui_selected_kind = "";
                 ui_selected_index = -1;
             }
+        } else if (!is_undefined(pending_choice)
+        && pending_choice.kind == "teleport_destination"
+        && (_hover_region.kind == "ship"
+            || _hover_region.kind == "opponent_ship")) {
+            resolve_teleport_destination_choice(
+                _hover_region.kind,
+                _hover_region.index
+            );
         } else if (!is_undefined(pending_choice)
         && pending_choice.kind == "quiet_robe_metroids"
         && _hover_region.kind == "metroid") {

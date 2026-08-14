@@ -67,7 +67,7 @@ function loc_modes_testing() {
                     "starter.researcher",
                     "starter.private_military",
                     "starter.private_military",
-                    "loc.g_f_s_tyr"
+                    "loc.g_f_s_olympus"
                 ]
             };
             case "SP": return {
@@ -75,7 +75,7 @@ function loc_modes_testing() {
                 replace_id: "starter.full_deck",
                 deck_ids: [
                     "loc.zebesian_pirate",
-                    "loc.attack_vessel",
+                    "loc.frigate_orpheon",
                     "starter.sloop",
                     "loc.beam_pirate",
                     "loc.space_pirate_homeworld",
@@ -130,7 +130,19 @@ function loc_modes_testing() {
             };
             default: return {
                 starter_id: "loc.armoured_frigate",
-                replace_id: "starter.military_rations"
+                replace_id: "starter.full_deck",
+                deck_ids: [
+                    "lop.dark_samus",
+                    "loc.gandrayda",
+                    "starter.private_military",
+                    "starter.private_military",
+                    "starter.researcher",
+                    "loc.security_guard",
+                    "lop.hive_mind_communication",
+                    "starter.away_team",
+                    "loc.delano_7",
+                    "loc.armoured_frigate"
+                ]
             };
         }
     };

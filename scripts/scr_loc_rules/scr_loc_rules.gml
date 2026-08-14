@@ -207,10 +207,6 @@ function loc_rules() {
         && _context == "raid_attacker_ship") {
             _conditional_bonus += 2;
         }
-        if (_card.definition_id == "loc.chozo_transport"
-        && _context == "raid_defender_ship") {
-            _conditional_bonus += 1;
-        }
         if (_card.definition_id == "loc.delano_7"
         && _context == "containment_ship") {
             _conditional_bonus += 2;
@@ -222,10 +218,47 @@ function loc_rules() {
             + _conditional_bonus;
     };
 
+    get_lab_metroid_hazard = function(_player, _metroid) {
+        var _old_bird_active = false;
+        for (var _character_index = 0;
+             _character_index < array_length(_player.board.characters);
+             _character_index++) {
+            if (_player.board.characters[_character_index].definition_id
+            == "loc.old_bird") {
+                _old_bird_active = true;
+                break;
+            }
+        }
+        return _old_bird_active ? 3 : _metroid.definition.hazard;
+    };
+
     get_lab_hazard = function(_player) {
         var _hazard = 0;
         for (var _i = 0; _i < array_length(_player.lab); _i++) {
-            _hazard += _player.lab[_i].definition.hazard;
+            _hazard += get_lab_metroid_hazard(_player, _player.lab[_i]);
+        }
+        return _hazard;
+    };
+
+    get_display_lab_hazard = function(_player) {
+        var _hazard = get_lab_hazard(_player);
+        if (array_length(_player.lab) <= 0) return _hazard;
+
+        if (!is_undefined(containment_resolution)
+        && containment_resolution.player_index == _player.index) {
+            return _hazard + containment_resolution.bonus_hazard;
+        }
+
+        if (!is_undefined(special_containment_sequence)
+        && special_containment_sequence.index >= 0
+        && special_containment_sequence.index
+            < array_length(special_containment_sequence.entries)) {
+            var _display_entry = special_containment_sequence.entries[
+                special_containment_sequence.index
+            ];
+            if (_display_entry.player_index == _player.index) {
+                return _hazard + _display_entry.bonus_hazard;
+            }
         }
         return _hazard;
     };
@@ -282,7 +315,9 @@ function loc_rules() {
         );
     };
 
-    resolve_metroid_breach = function(_player, _lab_index, _defer_character) {
+    resolve_metroid_breach = function(
+        _player, _lab_index, _defer_character, _from_containment
+    ) {
         var _metroid = _player.lab[_lab_index];
         if (_player.prevent_next_breach) {
             _player.prevent_next_breach = false;
@@ -320,6 +355,16 @@ function loc_rules() {
                 "Hunter breach gave each of " + _player.name
                 + "'s Characters a Phazon token."
             );
+        }
+
+        if (!is_undefined(_from_containment)
+        && _from_containment
+        && settings_experimental_breaching_mutation) {
+            array_push(
+                game_state.event_log,
+                "Breaching Mutation caused a Mutation roll."
+            );
+            resolve_mutation_roll();
         }
 
         if (is_undefined(_defer_character) || !_defer_character) {
@@ -438,7 +483,9 @@ function loc_rules() {
         && array_length(_player.lab) > 0) {
             var _forced_index = find_next_breaching_metroid(_player);
             if (_forced_index >= 0
-            && resolve_metroid_breach(_player, _forced_index)) {
+            && resolve_metroid_breach(
+                _player, _forced_index, false, true
+            )) {
                 _breach_count += 1;
             }
         }
@@ -449,7 +496,9 @@ function loc_rules() {
                  _omega_index >= 0;
                  _omega_index--) {
                 if (_player.lab[_omega_index].definition.id == "metroid.omega") {
-                    if (resolve_metroid_breach(_player, _omega_index)) {
+                    if (resolve_metroid_breach(
+                        _player, _omega_index, false, true
+                    )) {
                         _breach_count += 1;
                     }
                 }
@@ -469,6 +518,7 @@ function loc_rules() {
                 "Your Security did not contain the Hazard in your Lab. Metroids will breach one at a time until the sequence is complete."
             );
         }
+
         while (_effective_hazard > _containment_strength) {
             var _breach_index = find_next_breaching_metroid(_player);
             if (_breach_index < 0) {
@@ -481,7 +531,9 @@ function loc_rules() {
                 }
                 break;
             }
-            if (!resolve_metroid_breach(_player, _breach_index)) {
+            if (!resolve_metroid_breach(
+                _player, _breach_index, false, true
+            )) {
                 break;
             }
             _breach_count += 1;
@@ -629,7 +681,9 @@ function loc_rules() {
                 );
             }
 
-            if (!resolve_metroid_breach(_player, _breach_index, true)) {
+            if (!resolve_metroid_breach(
+                _player, _breach_index, true, true
+            )) {
                 return finish_containment_sequence();
             }
             _context.breach_count += 1;
@@ -1133,6 +1187,10 @@ function loc_rules() {
              _ship_index < array_length(_player.board.ships);
              _ship_index++) {
             var _ship = _player.board.ships[_ship_index];
+            if (settings_experimental_loaded_ships_exhausted
+            && array_length(_ship.cargo) > 0) {
+                _ship.skip_ready_after_lab_intake = true;
+            }
             while (array_length(_ship.cargo) > 0) {
                 var _metroid = array_pop(_ship.cargo);
                 if (game_state.game_mode != "batch"
@@ -1183,9 +1241,18 @@ function loc_rules() {
             var _skip_ready = _is_ship
                 && variable_struct_exists(_card, "used_for_containment_this_turn")
                 && _card.used_for_containment_this_turn;
+            var _loaded_ship_stays_exhausted = _is_ship
+                && variable_struct_exists(
+                    _card, "skip_ready_after_lab_intake"
+                )
+                && _card.skip_ready_after_lab_intake;
             if (_skip_ready) {
                 _card.used_for_containment_this_turn = false;
-            } else {
+            }
+            if (_loaded_ship_stays_exhausted) {
+                _card.skip_ready_after_lab_intake = false;
+            }
+            if (!_skip_ready && !_loaded_ship_stays_exhausted) {
                 _card.ready = true;
             }
         }
@@ -1293,7 +1360,7 @@ function loc_rules() {
         }
     };
 
-    resolve_mutation_phase = function() {
+    resolve_mutation_roll = function() {
         var _slot = irandom_range(0, 3);
         evolve_sr388_slot(_slot);
 
@@ -1310,7 +1377,12 @@ function loc_rules() {
 
         if (game_state.mutation >= game_state.mutation_limit) {
             resolve_game_over();
-        } else {
+        }
+    };
+
+    resolve_mutation_phase = function() {
+        resolve_mutation_roll();
+        if (game_state.phase != "game_over") {
             game_state.phase = "pass_turn";
         }
     };
@@ -1501,27 +1573,10 @@ function loc_rules() {
             _path = working_directory + _filename;
             _run_suffix += 1;
         }
-        var _file = file_text_open_write(_path);
-        if (_file < 0) {
-            show_debug_message(
-                "[BALANCE] Could not open match log: " + _path
-            );
-            return "";
-        }
-        file_text_write_string(
-            _file,
-            "LEGACY OF THE CHOZO - LIVE MATCH JOURNAL\n"
-            + "Seed: " + string(game_state.seed) + "\n"
-            + "Status: IN PROGRESS\n\n"
-        );
-        file_text_close(_file);
         game_state.balance_log_path = _path;
+        balance_journal_lines = [];
         balance_live_event_count = 0;
         balance_live_ai_count = 0;
-        show_debug_message(
-            "[BALANCE] Live match log created at "
-            + get_export_display_path(_path)
-        );
         return _path;
     };
 
@@ -1536,18 +1591,11 @@ function loc_rules() {
         && _ai_total <= balance_live_ai_count) {
             return true;
         }
-        var _file = file_text_open_append(_path);
-        if (_file < 0) {
-            show_debug_message(
-                "[BALANCE] Could not append match log: " + _path
-            );
-            return false;
-        }
         for (var _event_index = balance_live_event_count;
              _event_index < _event_total;
              _event_index++) {
-            file_text_write_string(
-                _file,
+            array_push(
+                balance_journal_lines,
                 "[EVENT " + string(_event_index + 1) + "] "
                     + event_log_entry_text(game_state.event_log[_event_index])
                     + "\n"
@@ -1556,12 +1604,11 @@ function loc_rules() {
         for (var _ai_index = balance_live_ai_count;
              _ai_index < _ai_total;
              _ai_index++) {
-            file_text_write_string(
-                _file,
+            array_push(
+                balance_journal_lines,
                 "[TRACE] " + ai_trace_log[_ai_index] + "\n"
             );
         }
-        file_text_close(_file);
         balance_live_event_count = _event_total;
         balance_live_ai_count = _ai_total;
         return true;
@@ -1572,23 +1619,49 @@ function loc_rules() {
             return "";
         }
         var _path = game_state.balance_log_path;
-        var _file = file_text_open_append(_path);
+        var _file = file_text_open_write(_path);
         if (_file < 0) {
             show_debug_message(
-                "[BALANCE] Could not finalize match log: " + _path
+                "[BALANCE] Could not write match log: " + _path
             );
             return "";
         }
         file_text_write_string(
             _file,
-            "\nSTATUS: COMPLETE\n\nFINAL MATCH SUMMARY\n"
-            + game_state.match_summary + "\n"
+            "LEGACY OF THE CHOZO - MATCH JOURNAL\n"
+            + "Seed: " + string(game_state.seed) + "\n"
+            + "Status: COMPLETE\n\n"
+        );
+        for (var _journal_index = 0;
+             _journal_index < array_length(balance_journal_lines);
+             _journal_index++) {
+            file_text_write_string(
+                _file,
+                balance_journal_lines[_journal_index]
+            );
+        }
+        file_text_write_string(
+            _file,
+            "\nFINAL MATCH SUMMARY\n" + game_state.match_summary + "\n"
         );
         file_text_close(_file);
-        show_debug_message(
-            "[BALANCE] Match log finalized at "
-            + get_export_display_path(_path)
-        );
+        if (game_state.game_mode == "batch") {
+            var _console_winner = game_state.winner < 0
+                ? "DRAW"
+                : game_state.players[game_state.winner].name;
+            show_debug_message(
+                "[BATCH MATCH] " + _console_winner
+                + " | Final Research "
+                + string(get_player_research(game_state.players[0]))
+                + "-"
+                + string(get_player_research(game_state.players[1]))
+            );
+        } else {
+            show_debug_message(
+                "[BALANCE] Match log finalized at "
+                + get_export_display_path(_path)
+            );
+        }
         return _path;
     };
 
@@ -1726,23 +1799,18 @@ function loc_rules() {
         || pending_choice.stage != "resolved") {
             return false;
         }
-        var _shop_index = pending_choice.shop_index;
-        if (_shop_index < 0
-        || _shop_index >= array_length(game_state.shop_row)
-        || game_state.shop_row[_shop_index].definition_id
-            != "loc.queen_metroid_awakens") {
-            _shop_index = -1;
-            for (var _queen_row_index = 0;
-                 _queen_row_index < array_length(game_state.shop_row);
-                 _queen_row_index++) {
-                if (game_state.shop_row[_queen_row_index].definition_id
-                    == "loc.queen_metroid_awakens") {
-                    _shop_index = _queen_row_index;
-                    break;
-                }
-            }
+        var _quarantined_queens = [];
+        for (var _queen_row_index = array_length(game_state.shop_row) - 1;
+             _queen_row_index >= 0;
+             _queen_row_index--) {
+            if (game_state.shop_row[_queen_row_index].definition_id
+            != "loc.queen_metroid_awakens") continue;
+            var _row_queen = game_state.shop_row[_queen_row_index];
+            array_delete(game_state.shop_row, _queen_row_index, 1);
+            _row_queen.zone = "shop_deck";
+            array_push(_quarantined_queens, _row_queen);
         }
-        if (_shop_index < 0) {
+        if (array_length(_quarantined_queens) <= 0) {
             pending_choice = undefined;
             array_push(
                 game_state.event_log,
@@ -1750,38 +1818,51 @@ function loc_rules() {
             );
             return false;
         }
-        var _queen = game_state.shop_row[_shop_index];
-        array_delete(game_state.shop_row, _shop_index, 1);
-        _queen.zone = "shop_deck";
-        // If Queen was the final card in the draw pile, recycle the discard
-        // before returning her. Otherwise Queen becomes the only drawable card
-        // and immediately retriggers forever while the replacement slot is open.
-        if (array_length(game_state.shop_deck) <= 0
-        && array_length(game_state.shop_discard) > 0) {
-            game_state.shop_deck = game_state.shop_discard;
-            game_state.shop_discard = [];
+
+        // Temporarily quarantine every other Queen as well. This prevents a
+        // replacement draw from revealing another copy while Queen resolution
+        // is cleaning and refilling the Shop.
+        for (var _queen_deck_index = array_length(game_state.shop_deck) - 1;
+             _queen_deck_index >= 0;
+             _queen_deck_index--) {
+            if (game_state.shop_deck[_queen_deck_index].definition_id
+            != "loc.queen_metroid_awakens") continue;
             array_push(
-                game_state.event_log,
-                "The Shop discard was recycled before Queen Metroid returned."
+                _quarantined_queens,
+                game_state.shop_deck[_queen_deck_index]
             );
+            array_delete(game_state.shop_deck, _queen_deck_index, 1);
         }
+        for (var _queen_discard_index =
+                 array_length(game_state.shop_discard) - 1;
+             _queen_discard_index >= 0;
+             _queen_discard_index--) {
+            if (game_state.shop_discard[_queen_discard_index].definition_id
+            != "loc.queen_metroid_awakens") continue;
+            var _discard_queen = game_state.shop_discard[
+                _queen_discard_index
+            ];
+            array_delete(
+                game_state.shop_discard, _queen_discard_index, 1
+            );
+            _discard_queen.zone = "shop_deck";
+            array_push(_quarantined_queens, _discard_queen);
+        }
+
         pending_choice = undefined;
-        if (array_length(game_state.shop_deck) <= 0) {
-            array_push(game_state.shop_deck, _queen);
-            array_push(
-                game_state.event_log,
-                "Queen Metroid returned to the Shop deck, but no other card was available to replace its slot."
-            );
-            return true;
-        }
-        // Fill the Event's slot before returning Queen to the draw pile so the
-        // same Queen cannot immediately draw and resolve herself again.
         refill_shop();
-        array_push(game_state.shop_deck, _queen);
+        for (var _queen_return_index = 0;
+             _queen_return_index < array_length(_quarantined_queens);
+             _queen_return_index++) {
+            var _returning_queen = _quarantined_queens[_queen_return_index];
+            _returning_queen.zone = "shop_deck";
+            array_push(game_state.shop_deck, _returning_queen);
+        }
         shuffle_array(game_state.shop_deck);
         array_push(
             game_state.event_log,
-            "Queen Metroid returned to the Shop deck and its slot was replaced."
+            string(array_length(_quarantined_queens))
+                + " Queen Metroid card(s) were cleared from the Shop and shuffled back into its deck."
         );
         return true;
     };

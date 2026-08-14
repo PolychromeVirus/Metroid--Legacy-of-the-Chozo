@@ -27,6 +27,19 @@ function loc_raids() {
 
     raid_validate_participants = function(_raid) {
         if (is_undefined(_raid) || _raid.kind != "raid") return true;
+        if (_raid.stage == "attacker_ship") {
+            var _declared_defender_exists = !is_undefined(raid_get_ship(
+                game_state.players[1 - game_state.active_player],
+                _raid.defender_ship_id
+            ));
+            if (_declared_defender_exists) return true;
+            array_push(
+                game_state.event_log,
+                "The declared raid ended because its defending Vehicle left play."
+            );
+            pending_choice = undefined;
+            return false;
+        }
         var _attacker_exists = !is_undefined(raid_get_ship(
             game_state.players[game_state.active_player],
             _raid.attacker_ship_id
@@ -88,8 +101,20 @@ function loc_raids() {
         return true;
     };
 
-    get_raid_cost = function(_player) {
-        var _cost = 2;
+    get_raid_cost = function(_player, _defender_ship) {
+        if (is_undefined(_defender_ship)) return 100000;
+        var _cost = get_card_stat(_defender_ship, "raid_defender_ship");
+        if (array_length(_defender_ship.cargo) > 0) {
+            _cost = 0;
+            for (var _cargo_index = 0;
+                 _cargo_index < array_length(_defender_ship.cargo);
+                 _cargo_index++) {
+                _cost = max(
+                    _cost,
+                    _defender_ship.cargo[_cargo_index].definition.hazard
+                );
+            }
+        }
         for (var _character_index = 0;
              _character_index < array_length(_player.board.characters);
              _character_index++) {
@@ -100,6 +125,75 @@ function loc_raids() {
             }
         }
         return max(0, _cost);
+    };
+
+    begin_raid_target_choice = function(_defender_ship_index) {
+        if (game_state.phase != "action") return false;
+        var _attacker_player = game_state.players[game_state.active_player];
+        var _defender_player = game_state.players[1 - game_state.active_player];
+        if (_defender_ship_index < 0
+        || _defender_ship_index >= array_length(_defender_player.board.ships)) {
+            return false;
+        }
+        var _defender_ship = _defender_player.board.ships[
+            _defender_ship_index
+        ];
+        var _raid_cost = get_raid_cost(_attacker_player, _defender_ship);
+        if (_attacker_player.command_points < _raid_cost) {
+            log_action_failure(
+                "Need " + string(_raid_cost) + " CP to raid "
+                + _defender_ship.definition.name + "."
+            );
+            return false;
+        }
+        var _has_ready_attacker = false;
+        for (var _ship_index = 0;
+             _ship_index < array_length(_attacker_player.board.ships);
+             _ship_index++) {
+            if (_attacker_player.board.ships[_ship_index].ready) {
+                _has_ready_attacker = true;
+                break;
+            }
+        }
+        if (!_has_ready_attacker) {
+            log_action_failure("No ready Ship can initiate this raid.");
+            return false;
+        }
+        pending_choice = {
+            kind: "raid",
+            stage: "attacker_ship",
+            defender_ship_id: _defender_ship.instance_id,
+            raid_cost: _raid_cost,
+            prompt: "Select one of your ready Ships to initiate the raid."
+        };
+        return true;
+    };
+
+    select_raid_attacker = function(_attacker_index) {
+        if (is_undefined(pending_choice)
+        || pending_choice.kind != "raid"
+        || pending_choice.stage != "attacker_ship") return false;
+        var _attacker_player = game_state.players[game_state.active_player];
+        var _defender_player = game_state.players[1 - game_state.active_player];
+        if (_attacker_index < 0
+        || _attacker_index >= array_length(_attacker_player.board.ships)
+        || !_attacker_player.board.ships[_attacker_index].ready) {
+            log_action_failure("Select one of your ready Ships to raid.");
+            return false;
+        }
+        var _defender_ship_id = pending_choice.defender_ship_id;
+        var _defender_index = raid_find_instance_index(
+            _defender_player.board.ships,
+            _defender_ship_id
+        );
+        if (_defender_index < 0) {
+            pending_choice = undefined;
+            log_action_failure("The targeted Ship is no longer in play.");
+            return false;
+        }
+        pending_choice = undefined;
+        if (!begin_raid_choice(_attacker_index)) return false;
+        return select_raid_target(_defender_index);
     };
 
     begin_raid_choice = function(_attacker_index) {
@@ -118,11 +212,20 @@ function loc_raids() {
             log_action_failure("Your opponent has no Ship to raid.");
             return false;
         }
-        var _raid_cost = get_raid_cost(_attacker_player);
-        if (_attacker_player.command_points < _raid_cost) {
-            log_action_failure(
-                "Need " + string(_raid_cost) + " CP to initiate this raid."
-            );
+        var _has_affordable_target = false;
+        for (var _target_index = 0;
+             _target_index < array_length(_defender_player.board.ships);
+             _target_index++) {
+            if (_attacker_player.command_points >= get_raid_cost(
+                _attacker_player,
+                _defender_player.board.ships[_target_index]
+            )) {
+                _has_affordable_target = true;
+                break;
+            }
+        }
+        if (!_has_affordable_target) {
+            log_action_failure("You cannot afford to raid any opposing Ship.");
             return false;
         }
 
@@ -141,7 +244,7 @@ function loc_raids() {
             ability_source_kind: "",
             ability_source_index: -1,
             ability_index: -1,
-            raid_cost: _raid_cost,
+            raid_cost: -1,
             prompt: "Select an opposing Ship to raid."
         };
         if (guidance_is_local_player(game_state.active_player)) {
@@ -165,11 +268,18 @@ function loc_raids() {
         || _defender_ship_index >= array_length(_defender_player.board.ships)) {
             return false;
         }
-        if (_attacker_player.command_points < pending_choice.raid_cost) {
-            log_action_failure("The raid cost can no longer be paid.");
-            pending_choice = undefined;
+        var _defender_ship = _defender_player.board.ships[
+            _defender_ship_index
+        ];
+        var _raid_cost = get_raid_cost(_attacker_player, _defender_ship);
+        if (_attacker_player.command_points < _raid_cost) {
+            log_action_failure(
+                "Need " + string(_raid_cost) + " CP to raid "
+                + _defender_ship.definition.name + "."
+            );
             return false;
         }
+        pending_choice.raid_cost = _raid_cost;
 
         var _attacker_index = raid_find_instance_index(
             _attacker_player.board.ships,
@@ -802,7 +912,8 @@ function loc_raids() {
         var _attacker_total = get_card_stat(_attacker, "raid_attacker_ship")
             + raid_exhaust_characters(
                 _attacker_player,
-                _raid.attacker_characters
+                _raid.attacker_characters,
+                undefined
             )
             + _raid.attacker_ability_bonus;
         var _defender_total = get_card_stat(_defender, "raid_defender_ship")
@@ -947,6 +1058,7 @@ function loc_raids() {
              || pending_choice.kind == "breach_character"
              || pending_choice.kind == "olympus_ready"
              || pending_choice.kind == "raid_cargo"
+             || pending_choice.kind == "back_in_the_day"
              || pending_choice.kind == "torizo_metroid"
              || pending_choice.kind == "chozo_ghosts_source"
              || pending_choice.kind == "chozo_ghosts_target")) {
@@ -1001,6 +1113,59 @@ function loc_raids() {
                                 game_state.event_log,
                                 "Leviathan Battleship replaced its cargo with "
                                 + "a Hunter Metroid."
+                            );
+                        }
+                    }
+                }
+                if (_ship.definition_id == "loc.chozo_transport") {
+                    for (var _transport_cargo_index = 0;
+                         _transport_cargo_index
+                            < array_length(_ship.cargo);
+                         _transport_cargo_index++) {
+                        var _transport_metroid =
+                            _ship.cargo[_transport_cargo_index];
+                        var _transport_stage =
+                            _transport_metroid.definition.stage;
+                        if (!is_real(_transport_stage)
+                        || _transport_stage >= 5
+                        || _transport_metroid.definition_id
+                            == "metroid.hunter") continue;
+                        var _transport_evolved = create_metroid_for_stage(
+                            _transport_stage + 1
+                        );
+                        _transport_evolved.zone = "ship";
+                        _transport_evolved.host_ship_instance_id =
+                            _ship.instance_id;
+                        _transport_evolved.ui_position_initialized =
+                            _transport_metroid.ui_position_initialized;
+                        _transport_evolved.ui_x = _transport_metroid.ui_x;
+                        _transport_evolved.ui_y = _transport_metroid.ui_y;
+                        _transport_evolved.ui_zone = _transport_metroid.ui_zone;
+                        _ship.cargo[_transport_cargo_index] =
+                            _transport_evolved;
+                        array_push(
+                            game_state.event_log,
+                            _transport_metroid.definition.name + " aboard "
+                            + _ship.definition.name + " evolved into "
+                            + _transport_evolved.definition.name + "."
+                        );
+                        var _transport_next_stage = _transport_stage + 1;
+                        if (_transport_next_stage == 4
+                        || _transport_next_stage == 5) {
+                            var _transport_mutation =
+                                _transport_next_stage == 5
+                                && game_state.mutation >= 4 ? 2 : 1;
+                            game_state.mutation = min(
+                                game_state.mutation + _transport_mutation,
+                                game_state.mutation_limit
+                            );
+                            array_push(
+                                game_state.event_log,
+                                "Mutation advanced "
+                                + string(_transport_mutation) + " space(s) to "
+                                + string(game_state.mutation) + "/"
+                                + string(game_state.mutation_limit)
+                                + " from Chozo Transport's research."
                             );
                         }
                     }
@@ -1435,6 +1600,10 @@ function loc_raids() {
         }
         cancel_pending_choice();
         resolve_end_turn_attachments();
+        if (game_state.mutation >= game_state.mutation_limit) {
+            resolve_game_over();
+            return true;
+        }
         var _ending_player = game_state.players[game_state.active_player];
         var _ending_zones = [
             _ending_player.board.characters,

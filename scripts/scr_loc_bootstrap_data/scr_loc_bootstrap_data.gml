@@ -267,6 +267,7 @@ function loc_bootstrap_data() {
             ready: true,
             temporary_stat_bonus: 0,
             ai_readied_by_effect_this_turn: false,
+            skip_ready_after_lab_intake: false,
             phazon_tokens: 0,
             attachments: [],
             cargo: [],
@@ -318,6 +319,7 @@ function loc_bootstrap_data() {
         if (variable_struct_exists(_card, "used_for_containment_this_turn")) {
             _card.used_for_containment_this_turn = false;
         }
+        _card.skip_ready_after_lab_intake = false;
         if (variable_struct_exists(_card, "host_instance_id")) {
             _card.host_instance_id = -1;
         }

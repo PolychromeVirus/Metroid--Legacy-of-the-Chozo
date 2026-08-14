@@ -3,6 +3,15 @@ function loc_draw() {
 
     var _screen_width = ui_screen_width;
     var _screen_height = ui_screen_height;
+    var _draw_pointer_x = window_mouse_get_x();
+    var _draw_pointer_y = window_mouse_get_y();
+    var _batch_win_rate_color = function(_rate) {
+        return merge_color(
+            c_white,
+            make_color_rgb(65, 255, 115),
+            clamp(_rate, 0, 100) / 100
+        );
+    };
 
     if (game_state.game_mode == "batch"
     && variable_global_exists("loc_batch_state")) {
@@ -13,27 +22,143 @@ function loc_draw() {
                 : _batch_draw_state.completed
         );
         draw_clear(make_color_rgb(5, 9, 15));
-        // Batch diagnostics contain machine-oriented values such as
-        // GAME_OVER and pending-choice identifiers. Use the antialiased system
-        // font so every character is available and scaled text remains legible.
-        draw_set_font(-1);
+        draw_set_font(FNT_METROID);
         draw_set_halign(fa_center);
         draw_set_valign(fa_middle);
         draw_set_color(make_color_rgb(126, 225, 255));
-        draw_text_transformed(
-            _screen_width * 0.5,
-            _screen_height * 0.42,
-            _batch_draw_state.replay_active
-                ? "INVALID MATCH DIAGNOSTIC REPLAY"
-                : "AI BATCH SIMULATION",
-            2,
-            2,
-            0
-        );
-        draw_set_color(c_white);
         draw_text(
             _screen_width * 0.5,
-            _screen_height * 0.51,
+            36,
+            _batch_draw_state.replay_active
+                ? "INVALID MATCH DIAGNOSTIC REPLAY"
+                : "AI BATCH SIMULATION"
+        );
+        var _live_profiles = ["", "GF", "SP", "CZT", "CZM"];
+        var _live_profile_count = array_length(_live_profiles);
+        var _live_profile_color = function(_profile) {
+            switch (_profile) {
+                case "GF": return LOC_COLOR_GF;
+                case "SP": return LOC_COLOR_SP;
+                case "CZT":
+                case "CZM": return LOC_COLOR_CZ;
+                default: return LOC_COLOR_NEUTRAL;
+            }
+        };
+        var _live_matrix_w = min(820, _screen_width - 100);
+        var _live_label_w = 72;
+        var _live_cell_w = floor(
+            (_live_matrix_w - _live_label_w) / _live_profile_count
+        );
+        var _live_cell_h = max(44, min(
+            76,
+            floor((_screen_height - 260) / _live_profile_count)
+        ));
+        var _live_matrix_x = floor((_screen_width - _live_matrix_w) * 0.5);
+        var _live_matrix_y = 105;
+        for (var _live_col = 0;
+             _live_col < _live_profile_count;
+             _live_col++) {
+            draw_set_color(_live_profile_color(_live_profiles[_live_col]));
+            draw_text(
+                floor(_live_matrix_x + _live_label_w
+                    + _live_col * _live_cell_w + _live_cell_w * 0.5),
+                _live_matrix_y - 24,
+                batch_profile_label(_live_profiles[_live_col])
+            );
+        }
+        for (var _live_row = 0;
+             _live_row < _live_profile_count;
+             _live_row++) {
+            draw_set_color(_live_profile_color(_live_profiles[_live_row]));
+            draw_text(
+                floor(_live_matrix_x + _live_label_w * 0.5),
+                floor(_live_matrix_y + _live_row * _live_cell_h
+                    + _live_cell_h * 0.5),
+                batch_profile_label(_live_profiles[_live_row])
+            );
+            for (var _live_col = 0;
+                 _live_col < _live_profile_count;
+                 _live_col++) {
+                var _live_profile_p1 = _live_profiles[_live_col];
+                var _live_profile_p2 = _live_profiles[_live_row];
+                var _live_games = 0;
+                var _live_p1_wins = 0;
+                var _live_draws = 0;
+                for (var _live_result_index = 0;
+                     _live_result_index
+                        < array_length(_batch_draw_state.results);
+                     _live_result_index++) {
+                    var _live_result =
+                        _batch_draw_state.results[_live_result_index];
+                    if (!_live_result.valid
+                    || _live_result.p1_profile != _live_profile_p1
+                    || _live_result.p2_profile != _live_profile_p2) {
+                        continue;
+                    }
+                    _live_games += 1;
+                    _live_p1_wins += _live_result.winner == 1 ? 1 : 0;
+                    _live_draws += _live_result.winner == 0 ? 1 : 0;
+                }
+                var _live_cell_x = _live_matrix_x + _live_label_w
+                    + _live_col * _live_cell_w;
+                var _live_cell_y = _live_matrix_y
+                    + _live_row * _live_cell_h;
+                var _live_is_current =
+                    _batch_draw_schedule.p1_profile == _live_profile_p1
+                    && _batch_draw_schedule.p2_profile == _live_profile_p2;
+                draw_set_color(make_color_rgb(13, 24, 34));
+                draw_rectangle(
+                    _live_cell_x + 2,
+                    _live_cell_y + 2,
+                    _live_cell_x + _live_cell_w - 2,
+                    _live_cell_y + _live_cell_h - 2,
+                    false
+                );
+                draw_set_color(_live_is_current
+                    ? make_color_rgb(126, 225, 255)
+                    : make_color_rgb(46, 70, 86));
+                draw_rectangle(
+                    _live_cell_x + 2,
+                    _live_cell_y + 2,
+                    _live_cell_x + _live_cell_w - 2,
+                    _live_cell_y + _live_cell_h - 2,
+                    true
+                );
+                var _live_win_rate = _live_games > 0
+                    ? 100 * (_live_p1_wins
+                        + (batch_report_raw_win_rate
+                            ? 0 : _live_draws * 0.5))
+                        / _live_games
+                    : 0;
+                draw_set_color(_live_games > 0
+                    ? _batch_win_rate_color(_live_win_rate)
+                    : make_color_rgb(90, 105, 116));
+                draw_text(
+                    floor(_live_cell_x + _live_cell_w * 0.5),
+                    floor(_live_cell_y + _live_cell_h * 0.38),
+                    _live_games > 0
+                        ? string_format(_live_win_rate, 0, 1) + "%"
+                        : "--"
+                );
+                if (_live_games > 0) {
+                    draw_set_color(make_color_rgb(120, 135, 150));
+                    draw_text_transformed(
+                        floor(_live_cell_x + _live_cell_w * 0.5),
+                        floor(_live_cell_y + _live_cell_h * 0.72),
+                        string(_live_p1_wins) + "/"
+                            + string(_live_games - _live_p1_wins - _live_draws)
+                            + " - " + string(_live_draws),
+                        0.7,
+                        0.7,
+                        0
+                    );
+                }
+            }
+        }
+        draw_set_color(make_color_rgb(120, 135, 150));
+        draw_text(
+            _screen_width * 0.5,
+            _live_matrix_y + _live_profile_count * _live_cell_h + 30,
             "MATCH " + string(
                 (_batch_draw_state.replay_active
                     ? _batch_draw_state.replay_index
@@ -43,33 +168,8 @@ function loc_draw() {
             + "  |  PAIR " + string(_batch_draw_schedule.pair_id)
             + " / " + string(_batch_draw_state.total_pairs)
             + "  LEG " + string(_batch_draw_schedule.leg)
-        );
-        draw_text(
-            _screen_width * 0.5,
-            _screen_height * 0.56,
-            game_state.players[0].name + "  VS  "
-            + game_state.players[1].name
-        );
-        draw_set_color(make_color_rgb(120, 135, 150));
-        draw_text(
-            _screen_width * 0.5,
-            _screen_height * 0.62,
-            "Seed " + string(game_state.seed)
-            + " | Turn " + string(game_state.turn_number)
-            + " | " + string_upper(game_state.phase)
-        );
-        draw_text(
-            _screen_width * 0.5,
-            _screen_height * 0.67,
-            "Last AI step: "
-            + (ai_last_action == "" ? "none" : ai_last_action)
-        );
-        draw_text(
-            _screen_width * 0.5,
-            _screen_height * 0.72,
-            "Match decisions: " + string(batch_match_steps)
-            + (_batch_draw_state.replay_active
-                ? " | detailed journal active" : "")
+            + "  /  " + game_state.players[0].name
+            + " VS " + game_state.players[1].name
         );
         var _batch_progress_total = max(1, _batch_draw_state.total_games);
         var _batch_progress_completed = clamp(
@@ -82,7 +182,7 @@ function loc_draw() {
         var _batch_bar_w = min(700, _screen_width - 80);
         var _batch_bar_h = 24;
         var _batch_bar_x = floor((_screen_width - _batch_bar_w) * 0.5);
-        var _batch_bar_y = floor(_screen_height * 0.79);
+        var _batch_bar_y = _screen_height - 78;
         draw_set_color(make_color_rgb(20, 31, 43));
         draw_rectangle(
             _batch_bar_x,
@@ -155,11 +255,27 @@ function loc_draw() {
         // generic UI choice and never changes faction identity or ownership.
         return LOC_COLOR_GF;
     };
-    var _ui_accent = _settings_accent(settings_ui_color_index, 0);
+    var _primary_palette_player = 0;
+    var _secondary_palette_player = 1;
+    if (game_state.game_mode == "network") {
+        _primary_palette_player = network_local_player >= 0
+            ? network_local_player
+            : game_state.view_player;
+        _secondary_palette_player = 1 - _primary_palette_player;
+    }
+    var _ui_accent = _settings_accent(
+        settings_ui_color_index,
+        _primary_palette_player
+    );
     var _opponent_ui_accent = _settings_accent(
         settings_opponent_ui_color_index,
-        1
+        _secondary_palette_player
     );
+    var _spectator_presentation = game_state.game_mode == "ai_watch"
+        || (game_state.game_mode == "network" && network_local_player < 0);
+    if (_spectator_presentation && settings_ui_color_index == 7) {
+        _ui_accent = LOC_COLOR_NEUTRAL;
+    }
     var _ui_palette_accent = _secondary_hotseat_palette
         ? _opponent_ui_accent
         : _ui_accent;
@@ -197,6 +313,7 @@ function loc_draw() {
     ui_hit_regions = [];
     ui_gameplay_input_enabled = title_menu_active
         || network_lobby_active
+        || _spectator_presentation
         || (
             game_state.game_mode != "ai_watch"
             && !game_state.players[game_state.view_player].is_ai
@@ -432,8 +549,19 @@ function loc_draw() {
         );
     };
 
+    var _draw_raidability_line = function(_x, _y, _width) {
+        draw_set_alpha(0.28);
+        draw_set_color(make_color_rgb(255, 35, 35));
+        draw_rectangle(_x, _y - 2, _x + _width, _y + 3, false);
+        draw_set_alpha(1);
+        draw_set_color(make_color_rgb(255, 76, 68));
+        draw_rectangle(_x, _y, _x + _width, _y + 2, false);
+    };
+
     var _card_has_usable_ability = function(_kind, _index, _card) {
-        if (!ui_gameplay_input_enabled
+        if (game_state.game_mode == "ai_watch"
+        || (game_state.game_mode == "network" && network_local_player < 0)
+        || !ui_gameplay_input_enabled
         || is_undefined(_card)
         || game_state.priority_player != game_state.view_player) {
             return false;
@@ -688,6 +816,8 @@ function loc_draw() {
         var _camera_control = _action == "camera_center_toggle"
             || _action == "camera_lock_toggle";
         var _always_available_control = _camera_control
+            || _action == "spectator_view_toggle"
+            || _action == "spectator_hands_toggle"
             || _action == "rematch"
             || _action == "back_to_menu"
             || string_pos("pause_", _action) == 1
@@ -768,7 +898,8 @@ function loc_draw() {
                 enabled: _enabled,
                 action: _action,
                 context_kind: context_button_source_kind,
-                context_index: context_button_source_index
+                context_index: context_button_source_index,
+                context_instance: context_button_source_instance
             }
         );
     };
@@ -1205,14 +1336,22 @@ function loc_draw() {
     draw_set_color(ui_color_title);
     draw_set_font(FNT_METROID);
     draw_set_valign(fa_middle);
-    var _header_starter = get_leader_identity_config(
-        _active_player.leader_identity_id
-    );
-    draw_text(
-        _margin,
-        _header_h * 0.5,
-        "STARTER DECK: " + string_upper(_header_starter.name)
-    );
+    if (_spectator_presentation) {
+        draw_text(
+            _margin,
+            _header_h * 0.5,
+            "VIEWING: " + string_upper(_active_player.name)
+        );
+    } else {
+        var _header_starter = get_leader_identity_config(
+            _active_player.leader_identity_id
+        );
+        draw_text(
+            _margin,
+            _header_h * 0.5,
+            "STARTER DECK: " + string_upper(_header_starter.name)
+        );
+    }
     draw_set_valign(fa_top);
     draw_set_font(-1);
     draw_set_halign(fa_center);
@@ -1274,8 +1413,20 @@ function loc_draw() {
         32,
         true
     );
+    if (_spectator_presentation) {
+        _draw_action_button(
+            "VIEW P" + string(game_state.view_player + 1),
+            "spectator_view_toggle",
+            _header_control_x + 158,
+            8,
+            84,
+            32,
+            true
+        );
+    }
     if (settings_debug_mode) {
-        var _debug_control_x = _header_control_x + 158;
+        var _debug_control_x = _header_control_x
+            + (_spectator_presentation ? 248 : 158);
         var _debug_available_w = max(44, _screen_width - _debug_control_x - 8);
         if (_watch_header) {
             var _sim_button_w = 42;
@@ -1591,7 +1742,7 @@ function loc_draw() {
             && (pending_choice.kind == "ability_target"
                 && can_resolve_ability_target(
                     pending_choice,
-                    _opponent_kind,
+                    get_raid_source_kind(_opponent_kind, _opponent_card),
                     _opponent_logical_index
                 )
                 || pending_choice.kind == "space_pirate_ready"
@@ -1624,10 +1775,22 @@ function loc_draw() {
                 var _opponent_raid_ability =
                     _opponent_card.controller == game_state.priority_player
                     && _opponent_kind != "opponent_lab"
-                    && pending_choice.stage != "target";
+                    && (pending_choice.stage == "attackers"
+                        || pending_choice.stage == "defenders");
                 if (_opponent_raid_target
                 || _opponent_raid_character
                 || _opponent_raid_ability) {
+                    var _opponent_raid_affordable = true;
+                    var _opponent_raid_cost = 0;
+                    if (_opponent_raid_target) {
+                        _opponent_raid_cost = get_raid_cost(
+                            game_state.players[game_state.active_player],
+                            _opponent_card
+                        );
+                        _opponent_raid_affordable = game_state.players[
+                            game_state.active_player
+                        ].command_points >= _opponent_raid_cost;
+                    }
                     var _opponent_raid_selected = _opponent_raid_character
                         && raid_array_contains(
                             pending_choice.stage == "attackers"
@@ -1647,7 +1810,8 @@ function loc_draw() {
                     draw_set_color(
                         _opponent_raid_selected
                             ? ui_color_selected
-                            : ui_color_success
+                            : (_opponent_raid_affordable
+                                ? ui_color_success : ui_color_muted)
                     );
                     draw_rectangle(
                         _opponent_bounds.x - 3,
@@ -1898,7 +2062,7 @@ function loc_draw() {
             _opponent_pile_h
         );
     } else {
-        draw_set_color(ui_color_line);
+        draw_set_color(_opponent_ui_accent);
         draw_rectangle(
             _opponent_discard_x,
             _opponent_discard_y,
@@ -1922,7 +2086,7 @@ function loc_draw() {
 
     // The opponent's Lab mirrors the active player's drawer from the top edge.
     var _opponent_lab_strength = get_ready_character_strength(_opponent);
-    var _opponent_lab_hazard = get_lab_hazard(_opponent);
+    var _opponent_lab_hazard = get_display_lab_hazard(_opponent);
     var _preview_opponent_containment_ship =
         game_state.phase == "containment"
         && game_state.active_player == 1 - game_state.view_player
@@ -2745,27 +2909,128 @@ function loc_draw() {
     ) * 0.5;
     var _sr_opponent_cp_right = _sr_opponent_plate_x1 - 2;
 
-    var _identity_nameplate_color = function(_player, _fallback) {
-        if (game_state.game_mode != "ai_watch") {
-            return _fallback;
+    var _draw_sr_research_counter = function(
+        _center_x,
+        _center_y,
+        _value,
+        _frame
+    ) {
+        var _icon_center_x = _center_x - 13;
+        var _value_center_x = _center_x + 16;
+        var _research_source_w = max(1, sprite_get_width(sprResearch));
+        var _research_source_h = max(1, sprite_get_height(sprResearch));
+        var _research_scale = min(
+            30 / _research_source_w,
+            32 / _research_source_h
+        );
+        var _icon_draw_x = _icon_center_x
+            - (_research_source_w * _research_scale * 0.5)
+            + (sprite_get_xoffset(sprResearch) * _research_scale);
+        var _icon_draw_y = _center_y
+            - (_research_source_h * _research_scale * 0.5)
+            + (sprite_get_yoffset(sprResearch) * _research_scale);
+        draw_sprite_ext(
+            sprResearch,
+            _frame,
+            _icon_draw_x,
+            _icon_draw_y,
+            _research_scale,
+            _research_scale,
+            0,
+            c_white,
+            1
+        );
+        draw_set_font(FNT_NUMBER);
+        draw_set_halign(fa_center);
+        draw_set_valign(fa_middle);
+        draw_set_color(c_black);
+        for (var _text_outline_x = -1;
+             _text_outline_x <= 1;
+             _text_outline_x++) {
+            for (var _text_outline_y = -1;
+                 _text_outline_y <= 1;
+                 _text_outline_y++) {
+                if (_text_outline_x != 0 || _text_outline_y != 0) {
+                    draw_text_transformed(
+                        _value_center_x + _text_outline_x,
+                        _center_y + _text_outline_y,
+                        string(_value),
+                        0.42,
+                        0.42,
+                        0
+                    );
+                }
+            }
         }
-        switch (_player.favored_faction) {
-            case "GF": return LOC_COLOR_GF;
-            case "SP": return LOC_COLOR_SP;
-            case "CZ": return LOC_COLOR_CZ;
-            case "BH": return LOC_COLOR_BH;
-            case "PZ": return LOC_COLOR_PZ;
-            default: return LOC_COLOR_NEUTRAL;
+        draw_set_color(c_white);
+        draw_text_transformed(
+            _value_center_x,
+            _center_y,
+            string(_value),
+            0.42,
+            0.42,
+            0
+        );
+        draw_set_font(FNT_METROID);
+    };
+
+    var _seat_nameplate_color = function(_player) {
+        var _seat_index = clamp(_player.index, 0, 1);
+        // AI seats identify themselves by their deck. Human seats use that
+        // seat's chosen UI accent; AUTO resolves against the same deck identity.
+        var _seat_setting = _seat_index == 0
+            ? settings_ui_color_index
+            : settings_opponent_ui_color_index;
+        if (_player.is_ai || _seat_setting == 7) {
+            switch (_player.favored_faction) {
+                case "GF": return LOC_COLOR_GF;
+                case "SP": return LOC_COLOR_SP;
+                case "CZ": return LOC_COLOR_CZ;
+                case "BH": return LOC_COLOR_BH;
+                case "PZ": return LOC_COLOR_PZ;
+                default: return LOC_COLOR_NEUTRAL;
+            }
+        }
+        switch (_seat_setting) {
+            case 1: return make_color_rgb(92, 242, 112);
+            case 2: return make_color_rgb(190, 112, 255);
+            case 3: return make_color_rgb(255, 185, 70);
+            case 4: return make_color_rgb(225, 235, 242);
+            case 5: return make_color_rgb(255, 92, 92);
+            case 6: return make_color_rgb(75, 135, 255);
+            default: return LOC_COLOR_GF;
         }
     };
-    var _sr_player_identity_color = _identity_nameplate_color(
-        _active_player,
-        LOC_COLOR_GF
-    );
-    var _sr_opponent_identity_color = _identity_nameplate_color(
-        _opponent,
-        ui_color_error
-    );
+    var _sr_player_identity_color = _seat_nameplate_color(_active_player);
+    var _sr_opponent_identity_color = _seat_nameplate_color(_opponent);
+    var _research_frame_for_player = function(_player) {
+        var _seat_index = clamp(_player.index, 0, 1);
+        var _seat_setting = _seat_index == 0
+            ? settings_ui_color_index
+            : settings_opponent_ui_color_index;
+        if (_player.is_ai || _seat_setting == 7) {
+            switch (_player.favored_faction) {
+                case "GF": return 0;
+                case "SP": return 1;
+                case "CZ": return 2;
+                case "BH": return 4;
+                case "PZ": return 5;
+                default: return 3;
+            }
+        }
+        switch (_seat_setting) {
+            case 0: return 0; // Cyan / GF
+            case 1: return 4; // Green
+            case 2: return 6; // Purple
+            case 3: return 2; // Amber
+            case 4: return 3; // White / Neutral
+            case 5: return 1; // Red / SP
+            case 6: return 5; // Blue / PZ
+            default: return 3;
+        }
+    };
+    var _sr_player_research_frame = _research_frame_for_player(_active_player);
+    var _sr_opponent_research_frame = _research_frame_for_player(_opponent);
     var _sr_player_identity_fill = merge_color(
         c_black,
         _sr_player_identity_color,
@@ -2777,9 +3042,8 @@ function loc_draw() {
         0.62
     );
 
-    // A dark underlay supplies contrast over either hemisphere; the restrained
-    // allegiance colors remain cyan/red except in AI-watch mode, where each
-    // identity uses its faction's hard-light palette.
+    // A dark underlay supplies contrast over either hemisphere while each
+    // nameplate and Research counter retain the owning seat's resolved accent.
     draw_set_alpha(0.52);
     draw_set_color(c_black);
     draw_rectangle(
@@ -2840,6 +3104,12 @@ function loc_draw() {
         _sr_player_plate_center_y,
         _active_player.name
     );
+    _draw_sr_research_counter(
+        _sr_player_plate_x1 - 31,
+        _sr_player_plate_center_y,
+        get_player_research(_active_player),
+        _sr_player_research_frame
+    );
     // Local CP reads left-to-right immediately after the local player's name.
     for (var _sr_player_cp_index = 0;
          _sr_player_cp_index < _active_player.command_points;
@@ -2859,6 +3129,12 @@ function loc_draw() {
         _sr_opponent_name_right,
         _sr_opponent_plate_center_y,
         _opponent.name
+    );
+    _draw_sr_research_counter(
+        _sr_opponent_plate_x2 + 34,
+        _sr_opponent_plate_center_y,
+        get_player_research(_opponent),
+        _sr_opponent_research_frame
     );
     _draw_cp_row(
         _sr_opponent_cp_right,
@@ -3026,7 +3302,7 @@ function loc_draw() {
             && (pending_choice.kind == "ability_target"
                 && can_resolve_ability_target(
                     pending_choice,
-                    _zone_kind,
+                    get_raid_source_kind(_zone_kind, _active_card),
                     _logical_zone_index
                 )
                 || pending_choice.kind == "space_pirate_ready"
@@ -3041,7 +3317,11 @@ function loc_draw() {
                 && pending_choice.player_index == game_state.active_player
                 && _zone_kind == "character"
                 && !_active_card.ready
-                && card_has_faction(_active_card, "GF"))) {
+                && card_has_faction(_active_card, "GF")
+                || pending_choice.kind == "raid"
+                && pending_choice.stage == "attacker_ship"
+                && _zone_kind == "ship"
+                && _active_card.ready)) {
                 draw_set_color(ui_color_success);
                 draw_rectangle(
                     _active_bounds.x - 3,
@@ -3068,7 +3348,8 @@ function loc_draw() {
             if (!is_undefined(pending_choice)
             && pending_choice.kind == "raid"
             && _active_card.controller == game_state.priority_player
-            && pending_choice.stage != "target") {
+            && (pending_choice.stage == "attackers"
+                || pending_choice.stage == "defenders")) {
                 var _active_raid_source_kind = get_raid_source_kind(
                     _zone_kind,
                     _active_card
@@ -3200,7 +3481,7 @@ function loc_draw() {
     // The Lab stays tucked beneath the location lane. Opening its tab lifts a
     // stage-ordered vertical stack, leaving each covered card's title visible.
     var _lab_strength = get_ready_character_strength(_active_player);
-    var _lab_hazard = get_lab_hazard(_active_player);
+    var _lab_hazard = get_display_lab_hazard(_active_player);
     var _preview_active_containment_ship =
         game_state.phase == "containment"
         && game_state.active_player == game_state.view_player
@@ -3882,6 +4163,135 @@ function loc_draw() {
     var _deck_pile_screen_y = _header_h
         + ((_pile_y - board_camera_y) * board_camera_zoom);
 
+    if (_spectator_presentation) {
+        // Both hands remain staged just outside the camera viewport. Peek slides
+        // them into fixed reference positions without moving or unlocking camera.
+        if (ui_hover_kind == "spectator_opponent_hand"
+        || ui_hover_kind == "spectator_active_hand") {
+            ui_hover_kind = "";
+            ui_hover_index = -1;
+            ui_hover_instance = undefined;
+        }
+        var _spectator_hand_w = 112;
+        var _spectator_hand_h = 157;
+        var _spectator_hand_slot = 94;
+        var _spectator_hand_center_x = board_viewport_right * 0.5;
+        var _spectator_top_total = _spectator_hand_slot
+            * array_length(_opponent.hand);
+        var _spectator_top_start = floor(
+            _spectator_hand_center_x - (_spectator_top_total * 0.5)
+        );
+        var _spectator_top_target_y = _header_h + 8;
+        var _spectator_top_y = lerp(
+            -_spectator_hand_h - 12,
+            _spectator_top_target_y,
+            spectator_hand_peek_amount
+        );
+        for (var _spectator_top_index = 0;
+             _spectator_top_index < array_length(_opponent.hand);
+             _spectator_top_index++) {
+            var _spectator_top_base_x = _spectator_top_start
+                + (_spectator_top_index * _spectator_hand_slot)
+                - floor(_spectator_hand_w * 0.5);
+            var _spectator_top_hovered = point_in_rectangle(
+                _draw_pointer_x,
+                _draw_pointer_y,
+                _spectator_top_base_x,
+                _spectator_top_y,
+                _spectator_top_base_x + _spectator_hand_w,
+                _spectator_top_y + _spectator_hand_h
+            );
+            if (_spectator_top_hovered) {
+                ui_hover_kind = "spectator_opponent_hand";
+                ui_hover_index = _spectator_top_index;
+                ui_hover_instance = _opponent.hand[_spectator_top_index];
+            }
+            var _spectator_top_draw_w = _spectator_top_hovered
+                ? _spectator_hand_w * 1.42 : _spectator_hand_w;
+            var _spectator_top_draw_h = _spectator_top_hovered
+                ? _spectator_hand_h * 1.42 : _spectator_hand_h;
+            var _spectator_top_x = _spectator_top_start
+                + (_spectator_top_index * _spectator_hand_slot)
+                - floor(_spectator_top_draw_w * 0.5);
+            _draw_card(
+                _opponent.hand[_spectator_top_index],
+                _spectator_top_x,
+                _spectator_top_y,
+                _spectator_top_draw_w,
+                _spectator_top_draw_h,
+                true
+            );
+            _add_hit_region(
+                "spectator_opponent_hand",
+                _spectator_top_index,
+                _opponent.hand[_spectator_top_index],
+                _spectator_top_x,
+                _spectator_top_y,
+                _spectator_top_draw_w,
+                _spectator_top_draw_h
+            );
+        }
+        var _spectator_bottom_total = _spectator_hand_slot
+            * array_length(_active_player.hand);
+        var _spectator_bottom_start = floor(
+            _spectator_hand_center_x - (_spectator_bottom_total * 0.5)
+        );
+        var _spectator_bottom_target_y = _screen_height
+            - _spectator_hand_h - 8;
+        var _spectator_bottom_y = lerp(
+            _screen_height + 12,
+            _spectator_bottom_target_y,
+            spectator_hand_peek_amount
+        );
+        for (var _spectator_bottom_index = 0;
+             _spectator_bottom_index < array_length(_active_player.hand);
+             _spectator_bottom_index++) {
+            var _spectator_bottom_base_x = _spectator_bottom_start
+                + (_spectator_bottom_index * _spectator_hand_slot)
+                - floor(_spectator_hand_w * 0.5);
+            var _spectator_bottom_hovered = point_in_rectangle(
+                _draw_pointer_x,
+                _draw_pointer_y,
+                _spectator_bottom_base_x,
+                _spectator_bottom_y,
+                _spectator_bottom_base_x + _spectator_hand_w,
+                _spectator_bottom_y + _spectator_hand_h
+            );
+            if (_spectator_bottom_hovered) {
+                ui_hover_kind = "spectator_active_hand";
+                ui_hover_index = _spectator_bottom_index;
+                ui_hover_instance = _active_player.hand[
+                    _spectator_bottom_index
+                ];
+            }
+            var _spectator_bottom_draw_w = _spectator_bottom_hovered
+                ? _spectator_hand_w * 1.42 : _spectator_hand_w;
+            var _spectator_bottom_draw_h = _spectator_bottom_hovered
+                ? _spectator_hand_h * 1.42 : _spectator_hand_h;
+            var _spectator_bottom_x = _spectator_bottom_start
+                + (_spectator_bottom_index * _spectator_hand_slot)
+                - floor(_spectator_bottom_draw_w * 0.5);
+            var _spectator_bottom_draw_y = _spectator_bottom_y
+                - (_spectator_bottom_draw_h - _spectator_hand_h);
+            _draw_card(
+                _active_player.hand[_spectator_bottom_index],
+                _spectator_bottom_x,
+                _spectator_bottom_draw_y,
+                _spectator_bottom_draw_w,
+                _spectator_bottom_draw_h,
+                true
+            );
+            _add_hit_region(
+                "spectator_active_hand",
+                _spectator_bottom_index,
+                _active_player.hand[_spectator_bottom_index],
+                _spectator_bottom_x,
+                _spectator_bottom_draw_y,
+                _spectator_bottom_draw_w,
+                _spectator_bottom_draw_h
+            );
+        }
+    } else {
     // The hand sits below the board rather than occupying its own panel. Cards
     // peek over the screen edge and rise into view on hover or selection.
     var _hand_count = max(1, array_length(_active_player.hand));
@@ -4020,6 +4430,7 @@ function loc_draw() {
          _hand_hud_region_index < array_length(ui_hit_regions);
          _hand_hud_region_index++) {
         ui_hit_regions[_hand_hud_region_index].screen_space = true;
+    }
     }
 
     matrix_set(matrix_world, _world_matrix_before);
@@ -4333,6 +4744,7 @@ function loc_draw() {
     // region names so this remains correct in hotseat and fixed-view modes.
     if (!is_undefined(pending_choice)
     && pending_choice.kind == "raid"
+    && variable_struct_exists(pending_choice, "attacker_ship_id")
     && pending_choice.defender_ship_id >= 0) {
         var _raid_line_attacker_player =
             game_state.players[game_state.active_player];
@@ -4561,6 +4973,28 @@ function loc_draw() {
             _detail_header += string_upper(_stat.kind)
                 + " " + string(_detail_stat_value);
         }
+        if (variable_struct_exists(_detail_definition, "hazard")
+        && !is_undefined(_detail_definition.hazard)) {
+            if (_detail_header != "") _detail_header += "    ";
+            var _detail_hazard = _detail_definition.hazard;
+            if (ui_selected_kind == "lab") {
+                _detail_hazard = get_lab_metroid_hazard(
+                    _active_player, _detail_instance
+                );
+            } else if (ui_selected_kind == "opponent_lab") {
+                _detail_hazard = get_lab_metroid_hazard(
+                    _opponent, _detail_instance
+                );
+            }
+            _detail_header += "HAZARD "
+                + string(_detail_hazard);
+        }
+        if (variable_struct_exists(_detail_definition, "research_value")
+        && !is_undefined(_detail_definition.research_value)) {
+            if (_detail_header != "") _detail_header += "    ";
+            _detail_header += "RESEARCH "
+                + string(_detail_definition.research_value);
+        }
         if (_detail_header != "") {
             draw_set_color(ui_color_title);
             draw_text(_detail_x, _detail_y, _detail_header);
@@ -4710,11 +5144,65 @@ function loc_draw() {
     var _pane_button_x1 = _button_x1;
     var _pane_button_x2 = _button_x2;
     var _pane_button_y = _button_y;
-    var _network_waiting_for_opponent = game_state.game_mode == "network"
-        && network_local_player != network_expected_player()
-        && game_state.phase != "game_over";
+    var _network_waiting_for_opponent = (
+        _spectator_presentation
+        || (game_state.game_mode == "network"
+            && network_local_player != network_expected_player())
+    ) && game_state.phase != "game_over";
     context_button_source_kind = "";
     context_button_source_index = -1;
+    context_button_source_instance = undefined;
+    if (!_network_waiting_for_opponent
+    && ui_gameplay_input_enabled
+    && is_undefined(pending_choice)
+    && game_state.phase == "action") {
+        var _has_ready_raid_ship = false;
+        for (var _ready_raid_ship_index = 0;
+             _ready_raid_ship_index < array_length(_active_player.board.ships);
+             _ready_raid_ship_index++) {
+            if (_active_player.board.ships[_ready_raid_ship_index].ready) {
+                _has_ready_raid_ship = true;
+                break;
+            }
+        }
+        var _raid_region_count = array_length(ui_hit_regions);
+        for (var _raid_region_index = 0;
+             _raid_region_index < _raid_region_count;
+             _raid_region_index++) {
+            var _raid_region = ui_hit_regions[_raid_region_index];
+            if (_raid_region.kind != "opponent_ship"
+            || is_undefined(_raid_region.instance)) continue;
+            var _target_raid_cost = get_raid_cost(
+                _active_player,
+                _raid_region.instance
+            );
+            var _target_raid_affordable = _has_ready_raid_ship
+                && _active_player.command_points >= _target_raid_cost;
+            var _target_raid_width = min(
+                160,
+                _raid_region.x2 - _raid_region.x1
+            );
+            var _target_raid_x = (_raid_region.x1 + _raid_region.x2
+                - _target_raid_width) * 0.5;
+            var _target_raid_y = _raid_region.y2 + 10;
+            if (_target_raid_affordable) {
+                _draw_raidability_line(
+                    _raid_region.x1,
+                    _raid_region.y2 + 5,
+                    _raid_region.x2 - _raid_region.x1
+                );
+            }
+            _draw_action_button(
+                "RAID - " + string(_target_raid_cost) + " CP",
+                "raid_target_" + string(_raid_region.index),
+                _target_raid_x,
+                _target_raid_y,
+                _target_raid_width,
+                32,
+                _target_raid_affordable
+            );
+        }
+    }
     var _raid_context_window = !is_undefined(pending_choice)
         && pending_choice.kind == "raid"
         && (pending_choice.stage == "attackers"
@@ -4750,6 +5238,7 @@ function loc_draw() {
         if (!is_undefined(_context_anchor_region)) {
             context_button_source_kind = ui_selected_kind;
             context_button_source_index = ui_selected_index;
+            context_button_source_instance = _selected_instance;
             _button_w = 108;
             var _context_total_w = (_button_w * 2) + _button_gap;
             var _context_center_x = (
@@ -4824,7 +5313,8 @@ function loc_draw() {
                     enabled: false,
                     action: "",
                     context_kind: context_button_source_kind,
-                    context_index: context_button_source_index
+                    context_index: context_button_source_index,
+                    context_instance: context_button_source_instance
                 }
             );
         }
@@ -4899,13 +5389,15 @@ function loc_draw() {
 
     if (_network_waiting_for_opponent) {
         _draw_action_button(
-            "OPPONENT'S TURN",
-            "",
+            _spectator_presentation
+                ? (spectator_hands_visible ? "HIDE HANDS" : "PEEK HANDS")
+                : "OPPONENT'S TURN",
+            _spectator_presentation ? "spectator_hands_toggle" : "",
             _pane_button_x1,
             _pane_button_y + 10,
             (_pane_button_w * 2) + _button_gap,
             _button_h + 18,
-            false
+            _spectator_presentation
         );
     } else if (!is_undefined(pending_choice)) {
         var _pending_prompt = variable_struct_exists(pending_choice, "prompt")
@@ -4924,16 +5416,20 @@ function loc_draw() {
                 + string(pending_choice.source.phazon_tokens
                     + pending_choice.selected_pz_bonus);
         }
-        _draw_action_required_prompt(
-            _pending_prompt,
-            _main_left,
-            _main_right,
-            _content_top,
-            _screen_height
-        );
+        if (pending_choice.kind != "back_in_the_day") {
+            _draw_action_required_prompt(
+                _pending_prompt,
+                _main_left,
+                _main_right,
+                _content_top,
+                _screen_height
+            );
+        }
 
         // Keep both sides' current totals visible while a raid is being built.
         if (pending_choice.kind == "raid"
+        && (pending_choice.stage == "attackers"
+            || pending_choice.stage == "defenders")
         || pending_choice.kind == "raid_cargo") {
             var _raid_attack_total = 0;
             var _raid_defense_total = 0;
@@ -5095,6 +5591,8 @@ function loc_draw() {
                 _button_h,
                 true
             );
+        } else if (pending_choice.kind == "back_in_the_day") {
+            // The mandatory Shop search is presented in its own card browser.
         } else if (pending_choice.kind == "special_containment_ship") {
             var _special_ship_kind =
                 pending_choice.player_index == game_state.active_player
@@ -5438,28 +5936,14 @@ function loc_draw() {
                 && _capture_has_target;
             var _ship_abilities = get_activated_abilities(_selected_instance);
             var _has_ship_ability = array_length(_ship_abilities) > 0;
-            var _raid_cost = get_raid_cost(_active_player);
-            var _can_raid = !is_undefined(_selected_instance)
-                && _selected_instance.ready
-                && array_length(_opponent.board.ships) > 0
-                && _active_player.command_points >= _raid_cost;
             _draw_action_button(
                 "CAPTURE - " + string(_capture_cost) + " CP",
                 "capture",
                 _button_x1,
                 _button_y,
-                _button_w,
+                (_button_w * 2) + _button_gap,
                 _button_h,
                 _can_begin_capture
-            );
-            _draw_action_button(
-                "RAID - " + string(_raid_cost) + " CP",
-                "raid",
-                _button_x2,
-                _button_y,
-                _button_w,
-                _button_h,
-                _can_raid
             );
             if (_has_ship_ability) {
                 _draw_action_button(
@@ -5551,6 +6035,7 @@ function loc_draw() {
         // drawn over their source card and do not replace these.
         context_button_source_kind = "";
         context_button_source_index = -1;
+        context_button_source_instance = undefined;
         _draw_action_button(
             "REFRESH HAND",
             "refresh_hand",
@@ -5672,6 +6157,7 @@ function loc_draw() {
     ui_selected_index = _actual_selected_index;
     context_button_source_kind = "";
     context_button_source_index = -1;
+    context_button_source_instance = undefined;
 
     draw_set_color(ui_color_hud_line);
     draw_line(_log_left + 10, _log_top, _rail_right - 10, _log_top);
@@ -5855,6 +6341,158 @@ function loc_draw() {
         enabled: true,
         action: ""
     });
+
+    if (!is_undefined(pending_choice)
+    && pending_choice.kind == "back_in_the_day") {
+        ui_hit_regions = [];
+        draw_set_alpha(0.72);
+        draw_set_color(c_black);
+        draw_rectangle(0, 0, _screen_width, _screen_height, false);
+        draw_set_alpha(1);
+
+        var _back_modal_w = min(920, _screen_width - 48);
+        var _back_modal_h = min(510, _screen_height - 48);
+        var _back_modal_x = floor((_screen_width - _back_modal_w) * 0.5);
+        var _back_modal_y = floor((_screen_height - _back_modal_h) * 0.5);
+        _draw_modal_panel(
+            _back_modal_x,
+            _back_modal_y,
+            _back_modal_x + _back_modal_w,
+            _back_modal_y + _back_modal_h,
+            "BACK IN THE DAY / SEARCH THE SHOP DECK"
+        );
+
+        draw_set_font(FNT_METROID);
+        draw_set_color(ui_color_text);
+        draw_set_halign(fa_center);
+        draw_text(
+            _back_modal_x + (_back_modal_w * 0.5),
+            _back_modal_y + 48,
+            "Choose a card to add to your discard pile."
+        );
+        draw_set_halign(fa_left);
+        draw_set_font(-1);
+
+        var _back_page_size = 4;
+        var _back_page_count = max(
+            1,
+            ceil(array_length(pending_choice.candidate_ids) / _back_page_size)
+        );
+        pending_choice.page = clamp(
+            pending_choice.page, 0, _back_page_count - 1
+        );
+        var _back_first = pending_choice.page * _back_page_size;
+        var _back_last = min(
+            array_length(pending_choice.candidate_ids),
+            _back_first + _back_page_size
+        );
+        var _back_visible_count = max(1, _back_last - _back_first);
+        var _back_grid_gap = 18;
+        var _back_grid_w = _back_modal_w - 56;
+        var _back_slot_w = min(
+            184,
+            floor((_back_grid_w
+                - (_back_grid_gap * (_back_visible_count - 1)))
+                / _back_visible_count)
+        );
+        var _back_slot_h = min(280, _back_modal_h - 158);
+        var _back_cards_w = (_back_slot_w * _back_visible_count)
+            + (_back_grid_gap * (_back_visible_count - 1));
+        var _back_cards_x = _back_modal_x
+            + floor((_back_modal_w - _back_cards_w) * 0.5);
+        var _back_cards_y = _back_modal_y + 82;
+
+        for (var _back_index = _back_first;
+             _back_index < _back_last;
+             _back_index++) {
+            var _back_card = undefined;
+            var _back_definition_id = pending_choice.candidate_ids[_back_index];
+            for (var _back_shop_index = 0;
+                 _back_shop_index < array_length(game_state.shop_deck);
+                 _back_shop_index++) {
+                if (game_state.shop_deck[_back_shop_index].definition_id
+                == _back_definition_id) {
+                    _back_card = game_state.shop_deck[_back_shop_index];
+                    break;
+                }
+            }
+            if (is_undefined(_back_card)) continue;
+
+            var _back_local_index = _back_index - _back_first;
+            var _back_card_x = _back_cards_x
+                + _back_local_index * (_back_slot_w + _back_grid_gap);
+            var _back_action = "back_in_day_pick_" + string(_back_index);
+            var _back_hovered = ui_hover_kind == "action"
+                && string(ui_hover_index) == _back_action;
+            var _back_hover_pad = _back_hovered ? 8 : 0;
+            if (_back_hovered) {
+                draw_set_color(ui_color_selected);
+                draw_rectangle(
+                    _back_card_x - 5,
+                    _back_cards_y - 5,
+                    _back_card_x + _back_slot_w + 5,
+                    _back_cards_y + _back_slot_h + 5,
+                    true
+                );
+            }
+            _draw_card(
+                _back_card,
+                _back_card_x - _back_hover_pad,
+                _back_cards_y - _back_hover_pad,
+                _back_slot_w + (_back_hover_pad * 2),
+                _back_slot_h + (_back_hover_pad * 2),
+                false,
+                false
+            );
+            array_push(ui_hit_regions, {
+                kind: "action",
+                index: _back_action,
+                instance: _back_card,
+                x1: _back_card_x,
+                y1: _back_cards_y,
+                x2: _back_card_x + _back_slot_w,
+                y2: _back_cards_y + _back_slot_h,
+                enabled: true,
+                action: _back_action
+            });
+        }
+
+        if (_back_page_count > 1) {
+            var _back_nav_w = 180;
+            var _back_nav_y = _back_modal_y + _back_modal_h - 54;
+            _draw_action_button(
+                "PREVIOUS",
+                "back_in_day_prev",
+                _back_modal_x + 28,
+                _back_nav_y,
+                _back_nav_w,
+                34,
+                pending_choice.page > 0
+            );
+            _draw_action_button(
+                "NEXT",
+                "back_in_day_next",
+                _back_modal_x + _back_modal_w - 28 - _back_nav_w,
+                _back_nav_y,
+                _back_nav_w,
+                34,
+                pending_choice.page < _back_page_count - 1
+            );
+            draw_set_font(FNT_METROID);
+            draw_set_color(ui_color_muted);
+            draw_set_halign(fa_center);
+            draw_set_valign(fa_middle);
+            draw_text(
+                _back_modal_x + (_back_modal_w * 0.5),
+                _back_nav_y + 17,
+                string(pending_choice.page + 1)
+                    + " / " + string(_back_page_count)
+            );
+            draw_set_halign(fa_left);
+            draw_set_valign(fa_top);
+            draw_set_font(-1);
+        }
+    }
 
     if (test_tools_open) {
         ui_hit_regions = [];
@@ -6896,7 +7534,7 @@ function loc_draw() {
         draw_set_alpha(1);
         draw_set_color(ui_color_menu_background);
         draw_rectangle(0, 0, _screen_width, _screen_height, false);
-        var _title_panel_w = min(1040, _screen_width - 96);
+        var _title_panel_w = min(1240, _screen_width - 48);
         var _title_panel_h = min(700, _screen_height - 96);
         var _title_panel_x = floor((_screen_width - _title_panel_w) * 0.5);
         var _title_panel_y = floor((_screen_height - _title_panel_h) * 0.5);
@@ -6956,8 +7594,17 @@ function loc_draw() {
         var _title_left_x = _title_panel_x + 42;
         var _title_left_w = 260;
         var _title_right_x = _title_left_x + _title_left_w + 34;
-        var _title_right_w = _title_panel_x + _title_panel_w - 42
+        var _title_available_w = _title_panel_x + _title_panel_w - 42
             - _title_right_x;
+        var _title_right_w = min(
+            430,
+            max(260, floor((_title_available_w - 34) * 0.58))
+        );
+        var _title_tooltip_x = _title_right_x + _title_right_w + 34;
+        var _title_tooltip_w = max(
+            0,
+            _title_panel_x + _title_panel_w - 42 - _title_tooltip_x
+        );
         draw_set_color(ui_color_line);
         draw_line(
             _title_right_x - 17,
@@ -6965,6 +7612,14 @@ function loc_draw() {
             _title_right_x - 17,
             _title_content_bottom
         );
+        if (_title_tooltip_w > 0) {
+            draw_line(
+                _title_tooltip_x - 17,
+                _title_content_top,
+                _title_tooltip_x - 17,
+                _title_content_bottom
+            );
+        }
 
         var _mode_labels = [
             "VS. AI", "HOTSEAT", "NETWORK PLAY", "AI VS AI",
@@ -7007,6 +7662,8 @@ function loc_draw() {
 
         var _title_name_fields = [];
         var _right_y = _title_content_top;
+        var _submenu_button_h = _mode_button_h;
+        var _submenu_step = _submenu_button_h + 10;
         if (title_context_mode == "ai") {
             array_push(_title_name_fields, {
                 label: "PLAYER NAME", kind: "title_name_p1",
@@ -7015,14 +7672,15 @@ function loc_draw() {
             _draw_action_button(
                 "PLAYER DECK: "
                     + title_leader_button_names[title_leader_p1_index],
-                "title_cycle_leader_p1", _title_right_x, _right_y + 76,
-                _title_right_w, 46, true
+                "title_cycle_leader_p1", _title_right_x, _right_y + 88,
+                _title_right_w, _submenu_button_h, true
             );
             _draw_action_button(
                 "AI DECK: "
                     + title_leader_button_names[title_leader_p2_index],
-                "title_cycle_leader_p2", _title_right_x, _right_y + 134,
-                _title_right_w, 46, true
+                "title_cycle_leader_p2", _title_right_x,
+                _right_y + 88 + _submenu_step,
+                _title_right_w, _submenu_button_h, true
             );
         } else if (title_context_mode == "hotseat") {
             array_push(_title_name_fields, {
@@ -7032,18 +7690,18 @@ function loc_draw() {
             _draw_action_button(
                 "PLAYER 1 DECK: "
                     + title_leader_button_names[title_leader_p1_index],
-                "title_cycle_leader_p1", _title_right_x, _right_y + 70,
-                _title_right_w, 42, true
+                "title_cycle_leader_p1", _title_right_x, _right_y + 88,
+                _title_right_w, _submenu_button_h, true
             );
             array_push(_title_name_fields, {
                 label: "PLAYER 2 NAME", kind: "title_name_p2",
-                value: title_player_two_name, y: _right_y + 124
+                value: title_player_two_name, y: _right_y + 148
             });
             _draw_action_button(
                 "PLAYER 2 DECK: "
                     + title_leader_button_names[title_leader_p2_index],
-                "title_cycle_leader_p2", _title_right_x, _right_y + 194,
-                _title_right_w, 42, true
+                "title_cycle_leader_p2", _title_right_x, _right_y + 236,
+                _title_right_w, _submenu_button_h, true
             );
         } else if (title_context_mode == "network") {
             array_push(_title_name_fields, {
@@ -7053,84 +7711,190 @@ function loc_draw() {
             _draw_action_button(
                 "PLAYER DECK: "
                     + title_leader_button_names[title_leader_p1_index],
-                "title_cycle_leader_p1", _title_right_x, _right_y + 76,
-                _title_right_w, 46, true
+                "title_cycle_leader_p1", _title_right_x, _right_y + 88,
+                _title_right_w, _submenu_button_h, true
             );
             _draw_action_button(
                 "HOST GAME", "title_network_host",
-                _title_right_x, _right_y + 144, _title_right_w, 46, true
+                _title_right_x, _right_y + 138,
+                _title_right_w, _submenu_button_h, true
             );
             array_push(_title_name_fields, {
                 label: "HOST ADDRESS", kind: "title_network_address",
-                value: net_ip_input, y: _right_y + 212
+                value: net_ip_input, y: _right_y + 198
             });
             _draw_action_button(
                 "JOIN GAME", "title_network_join",
-                _title_right_x, _right_y + 282, _title_right_w, 46, true
+                _title_right_x, _right_y + 286,
+                _title_right_w, _submenu_button_h, true
             );
         } else if (title_context_mode == "ai_watch") {
             _draw_action_button(
                 "PLAYER 1 DECK: "
                     + title_leader_button_names[title_leader_p1_index],
                 "title_cycle_leader_p1", _title_right_x, _right_y,
-                _title_right_w, 48, true
+                _title_right_w, _submenu_button_h, true
             );
             _draw_action_button(
                 "PLAYER 2 DECK: "
                     + title_leader_button_names[title_leader_p2_index],
-                "title_cycle_leader_p2", _title_right_x, _right_y + 62,
-                _title_right_w, 48, true
+                "title_cycle_leader_p2", _title_right_x,
+                _right_y + _submenu_step,
+                _title_right_w, _submenu_button_h, true
             );
         } else if (title_context_mode == "settings") {
+            var _settings_view_top = _right_y - 3;
+            var _settings_view_bottom = _title_content_bottom;
+            var _settings_button_h = _submenu_button_h;
+            var _settings_button_step = _settings_button_h + 10;
+            var _settings_label_y = (_settings_button_step * 7)
+                + _settings_button_h + 24;
+            var _settings_toggle_y = _settings_label_y + 34;
+            // Keep the final button border clear of the lower scissor edge.
+            var _settings_content_h = _settings_toggle_y
+                + _settings_button_step + _settings_button_h + 4;
+            var _settings_button_w = _title_right_w;
+            title_settings_scroll_max = max(
+                0,
+                _settings_content_h
+                    - (_settings_view_bottom - _settings_view_top)
+            );
+            title_settings_scroll = clamp(
+                title_settings_scroll, 0, title_settings_scroll_max
+            );
+            _add_hit_region(
+                "title_settings_scroll", 0, undefined,
+                _title_right_x, _settings_view_top,
+                _title_right_w,
+                _settings_view_bottom - _settings_view_top
+            );
+            var _settings_region_start = array_length(ui_hit_regions);
+            gpu_set_scissor(
+                _title_right_x - 3, _settings_view_top,
+                _title_right_w + 3,
+                max(1, _settings_view_bottom - _settings_view_top)
+            );
+            var _settings_draw_y = _right_y - title_settings_scroll;
             _draw_action_button(
                 settings_default_center_far
                     ? "DEFAULT VIEW: FAR" : "DEFAULT VIEW: CLOSE",
-                "settings_view", _title_right_x, _right_y,
-                _title_right_w, 44, true
+                "settings_view", _title_right_x, _settings_draw_y,
+                _settings_button_w, _settings_button_h, true
             );
             _draw_action_button(
                 settings_default_camera_locked
                     ? "DEFAULT CAMERA: LOCKED" : "DEFAULT CAMERA: FREE",
-                "settings_lock", _title_right_x, _right_y + 54,
-                _title_right_w, 44, true
+                "settings_lock", _title_right_x,
+                _settings_draw_y + _settings_button_step,
+                _settings_button_w, _settings_button_h, true
             );
             _draw_action_button(
                 "PLAYER 1 UI: "
                     + settings_ui_color_names[settings_ui_color_index],
-                "settings_color", _title_right_x, _right_y + 108,
-                _title_right_w, 44, true
+                "settings_color", _title_right_x,
+                _settings_draw_y + (_settings_button_step * 2),
+                _settings_button_w, _settings_button_h, true
             );
             _draw_action_button(
                 "PLAYER 2 UI: "
                     + settings_ui_color_names[settings_opponent_ui_color_index],
-                "settings_opponent_color", _title_right_x, _right_y + 162,
-                _title_right_w, 44, true
+                "settings_opponent_color", _title_right_x,
+                _settings_draw_y + (_settings_button_step * 3),
+                _settings_button_w, _settings_button_h, true
             );
             _draw_action_button(
                 settings_debug_mode
                     ? "DEBUG TOOLS: SHOWN" : "DEBUG TOOLS: HIDDEN",
-                "settings_debug", _title_right_x, _right_y + 216,
-                _title_right_w, 44, true
+                "settings_debug", _title_right_x,
+                _settings_draw_y + (_settings_button_step * 4),
+                _settings_button_w, _settings_button_h, true
             );
             _draw_action_button(
                 settings_context_help
                     ? "CONTEXT HELP: SHOWN" : "CONTEXT HELP: HIDDEN",
-                "settings_context_help", _title_right_x, _right_y + 270,
-                _title_right_w, 44, true
+                "settings_context_help", _title_right_x,
+                _settings_draw_y + (_settings_button_step * 5),
+                _settings_button_w, _settings_button_h, true
             );
             _draw_action_button(
                 settings_first_game_guidance
                     ? "FIRST-GAME GUIDANCE: ON"
                     : "FIRST-GAME GUIDANCE: OFF",
-                "settings_guidance", _title_right_x, _right_y + 324,
-                _title_right_w, 44, true
+                "settings_guidance", _title_right_x,
+                _settings_draw_y + (_settings_button_step * 6),
+                _settings_button_w, _settings_button_h, true
             );
             _draw_action_button(
                 "RESTORE FIRST-TIME HINTS",
                 "settings_restore_guidance",
-                _title_right_x, _right_y + 378,
-                _title_right_w, 44, true
+                _title_right_x,
+                _settings_draw_y + (_settings_button_step * 7),
+                _settings_button_w, _settings_button_h, true
             );
+            draw_set_font(FNT_METROID);
+            draw_set_halign(fa_left);
+            draw_set_valign(fa_top);
+            draw_set_color(ui_color_muted);
+            draw_text(
+                _title_right_x, _settings_draw_y + _settings_label_y,
+                "EXPERIMENTAL GAMEPLAY TOGGLES"
+            );
+            _draw_action_button(
+                settings_experimental_breaching_mutation
+                    ? "BREACHING MUTATION: ON"
+                    : "BREACHING MUTATION: OFF",
+                "settings_breaching_mutation",
+                _title_right_x, _settings_draw_y + _settings_toggle_y,
+                _settings_button_w, _settings_button_h, true
+            );
+            _draw_action_button(
+                settings_experimental_loaded_ships_exhausted
+                    ? "LOADED SHIPS STAY EXHAUSTED: ON"
+                    : "LOADED SHIPS STAY EXHAUSTED: OFF",
+                "settings_loaded_ships_exhausted",
+                _title_right_x,
+                _settings_draw_y + _settings_toggle_y + _settings_button_step,
+                _settings_button_w, _settings_button_h, true
+            );
+            gpu_set_scissor(0, 0, _screen_width, _screen_height);
+            for (var _settings_region_index = _settings_region_start;
+                 _settings_region_index < array_length(ui_hit_regions);
+                 _settings_region_index++) {
+                var _settings_region = ui_hit_regions[_settings_region_index];
+                _settings_region.y1 = max(
+                    _settings_region.y1, _settings_view_top
+                );
+                _settings_region.y2 = min(
+                    _settings_region.y2, _settings_view_bottom
+                );
+                _settings_region.enabled = _settings_region.enabled
+                    && _settings_region.y2 > _settings_region.y1;
+            }
+            if (title_settings_scroll_max > 0) {
+                var _settings_track_x =
+                    _title_right_x + _settings_button_w + 10;
+                var _settings_view_h =
+                    _settings_view_bottom - _settings_view_top;
+                var _settings_thumb_h = max(
+                    30,
+                    _settings_view_h * (_settings_view_h / _settings_content_h)
+                );
+                var _settings_thumb_y = _settings_view_top
+                    + ((_settings_view_h - _settings_thumb_h)
+                        * title_settings_scroll
+                        / max(1, title_settings_scroll_max));
+                draw_set_color(ui_color_line);
+                draw_rectangle(
+                    _settings_track_x, _settings_view_top,
+                    _settings_track_x + 2, _settings_view_bottom, false
+                );
+                draw_set_color(ui_color_title);
+                draw_rectangle(
+                    _settings_track_x - 1, _settings_thumb_y,
+                    _settings_track_x + 3,
+                    _settings_thumb_y + _settings_thumb_h, false
+                );
+            }
         }
         for (var _title_field_index = 0;
              _title_field_index < array_length(_title_name_fields);
@@ -7138,15 +7902,17 @@ function loc_draw() {
             var _title_field = _title_name_fields[_title_field_index];
             draw_set_halign(fa_left);
             draw_set_valign(fa_top);
+            draw_set_font(FNT_METROID);
             draw_set_color(ui_color_muted);
             draw_text(_title_right_x, _title_field.y, _title_field.label);
-            var _title_field_y = _title_field.y + 22;
+            draw_set_font(-1);
+            var _title_field_y = _title_field.y + 36;
             draw_set_color(ui_color_panel_alt);
             draw_rectangle(
                 _title_right_x,
                 _title_field_y,
                 _title_right_x + _title_right_w,
-                _title_field_y + 42,
+                _title_field_y + _submenu_button_h,
                 false
             );
             var _title_field_editing =
@@ -7162,7 +7928,7 @@ function loc_draw() {
                 _title_right_x,
                 _title_field_y,
                 _title_right_x + _title_right_w,
-                _title_field_y + 42,
+                _title_field_y + _submenu_button_h,
                 true
             );
             draw_set_halign(fa_center);
@@ -7170,7 +7936,7 @@ function loc_draw() {
             draw_set_color(ui_color_text);
             draw_text(
                 _title_right_x + _title_right_w * 0.5,
-                _title_field_y + 21,
+                _title_field_y + _submenu_button_h * 0.5,
                 _title_field.value
             );
             _add_hit_region(
@@ -7180,7 +7946,7 @@ function loc_draw() {
                 _title_right_x,
                 _title_field_y,
                 _title_right_w,
-                42
+                _submenu_button_h
             );
         }
         draw_set_halign(fa_left);
@@ -7192,11 +7958,156 @@ function loc_draw() {
                 "PLAY",
                 "title_play_context",
                 _title_right_x,
-                _title_content_bottom - 52,
+                _title_content_bottom - _submenu_button_h,
                 _title_right_w,
-                48,
+                _submenu_button_h,
                 true
             );
+        }
+        if (_title_tooltip_w >= 120) {
+            var _title_hover_candidate = ui_hover_kind == "action"
+                ? string(ui_hover_index) : ui_hover_kind;
+            if (string_pos("title_", _title_hover_candidate) == 1
+            || string_pos("settings_", _title_hover_candidate) == 1) {
+                title_last_hover_key = _title_hover_candidate;
+            }
+            var _title_hover_key = title_last_hover_key;
+            var _title_tip_title = "MENU HELP";
+            var _title_tip_body =
+                "Hover over an option for more information";
+            switch (_title_hover_key) {
+                case "title_select_ai":
+                    _title_tip_title = "VS. AI";
+                    _title_tip_body = "Play a two-player game against an AI opponent.";
+                    break;
+                case "title_select_hotseat":
+                    _title_tip_title = "HOTSEAT";
+                    _title_tip_body = "Play locally with two human players sharing this screen.";
+                    break;
+                case "title_select_network":
+                    _title_tip_title = "NETWORK PLAY";
+                    _title_tip_body = "Host or join a lobby for players and spectators.";
+                    break;
+                case "title_select_ai_watch":
+                    _title_tip_title = "AI VS AI";
+                    _title_tip_body = "Observe two AI players using the spectator interface.";
+                    break;
+                case "title_select_settings":
+                    _title_tip_title = "SETTINGS";
+                    _title_tip_body = "Adjust presentation, guidance, and pre-match experimental rules.";
+                    break;
+                case "title_select_help":
+                    _title_tip_title = "HELP";
+                    _title_tip_body = "Open the rules and game-concept reference.";
+                    break;
+                case "title_select_batch":
+                    _title_tip_title = "BATCH TESTS";
+                    _title_tip_body = "Run headless AI games and export matchup results.";
+                    break;
+                case "title_select_regression":
+                    _title_tip_title = "REGRESSION TESTS";
+                    _title_tip_body = "Run automated checks for known rules interactions.";
+                    break;
+                case "title_name_p1":
+                    _title_tip_title = "PLAYER NAME";
+                    _title_tip_body = "Set your name. You will be referred to by this name in offline and online modes.";
+                    break;
+                case "title_name_p2":
+                    _title_tip_title = "PLAYER 2 NAME";
+                    _title_tip_body = "Set Player 2's name. This will be used only in offline modes.";
+                    break;
+                case "title_network_address":
+                    _title_tip_title = "HOST ADDRESS";
+                    _title_tip_body = "Enter the host's IP address before joining their lobby.";
+                    break;
+                case "title_cycle_leader_p1":
+                    if (title_context_mode == "ai") {
+                        _title_tip_title = "PLAYER DECK";
+                        _title_tip_body = "Choose your starter deck for this game.";
+                    } else if (title_context_mode == "network") {
+                        _title_tip_title = "PLAYER DECK";
+                        _title_tip_body = "Choose the starter deck you bring into the lobby.";
+                    } else {
+                        _title_tip_title = "PLAYER 1 DECK";
+                        _title_tip_body = "Choose the starter deck used by Player 1.";
+                    }
+                    break;
+                case "title_cycle_leader_p2":
+                    if (title_context_mode == "ai") {
+                        _title_tip_title = "AI PLAYER DECK";
+                        _title_tip_body = "Choose the opposing AI player's starter deck.";
+                    } else {
+                        _title_tip_title = "PLAYER 2 DECK";
+                        _title_tip_body = "Choose the starter deck used by Player 2.";
+                    }
+                    break;
+                case "title_play_context":
+                    _title_tip_title = "PLAY";
+                    _title_tip_body = "Start the selected local game with the current configuration.";
+                    break;
+                case "title_network_host":
+                    _title_tip_title = "HOST GAME";
+                    _title_tip_body = "Create a lobby using your current name and starter deck.";
+                    break;
+                case "title_network_join":
+                    _title_tip_title = "JOIN GAME";
+                    _title_tip_body = "Connect to the entered host address and enter its lobby.";
+                    break;
+                case "settings_view":
+                    _title_tip_title = "DEFAULT VIEW";
+                    _title_tip_body = "Choose whether matches open with the camera close or showing the full board.";
+                    break;
+                case "settings_lock":
+                    _title_tip_title = "DEFAULT CAMERA";
+                    _title_tip_body = "Locked follows play automatically. Free allows right-click camera movement.";
+                    break;
+                case "settings_color":
+                    _title_tip_title = "PLAYER 1 UI";
+                    _title_tip_body = "Choose Player 1's interface color. Auto follows their selected deck.";
+                    break;
+                case "settings_opponent_color":
+                    _title_tip_title = "PLAYER 2 UI";
+                    _title_tip_body = "Choose Player 2's interface color. Auto follows their selected deck.";
+                    break;
+                case "settings_debug":
+                    _title_tip_title = "DEBUG TOOLS";
+                    _title_tip_body = "Show developer controls, batch simulations, and regression tests.";
+                    break;
+                case "settings_context_help":
+                    _title_tip_title = "CONTEXT HELP";
+                    _title_tip_body = "Show hover explanations for actions and their unavailable states during play.";
+                    break;
+                case "settings_guidance":
+                    _title_tip_title = "FIRST-GAME GUIDANCE";
+                    _title_tip_body = "Enable or disable the prompts that introduce game concepts as they occur.";
+                    break;
+                case "settings_restore_guidance":
+                    _title_tip_title = "RESTORE HINTS";
+                    _title_tip_body = "Mark every first-time guidance prompt as unseen so they can appear again.";
+                    break;
+                case "settings_breaching_mutation":
+                    _title_tip_title = "BREACHING MUTATION";
+                    _title_tip_body = "Experimental: each Metroid that breaches during containment causes a Mutation roll.";
+                    break;
+                case "settings_loaded_ships_exhausted":
+                    _title_tip_title = "LOADED SHIPS STAY EXHAUSTED";
+                    _title_tip_body = "Experimental: Ships carrying a Metroid do not ready at the start of their controller's turn.";
+                    break;
+            }
+            draw_set_font(FNT_METROID);
+            draw_set_halign(fa_left);
+            draw_set_valign(fa_top);
+            draw_set_color(ui_color_title);
+            draw_text(_title_tooltip_x, _title_content_top, _title_tip_title);
+            draw_set_color(ui_color_text);
+            draw_text_ext(
+                _title_tooltip_x,
+                _title_content_top + 42,
+                _title_tip_body,
+                28,
+                _title_tooltip_w
+            );
+            draw_set_font(-1);
         }
         draw_set_halign(fa_center);
         draw_set_color(ui_color_muted);
@@ -7282,7 +8193,7 @@ function loc_draw() {
                 _screen_height
             );
             var _batch_panel_w = min(860, _screen_width - 120);
-            var _batch_panel_h = min(650, _screen_height - 100);
+            var _batch_panel_h = min(760, _screen_height - 40);
             var _batch_panel_x = floor(
                 (_screen_width - _batch_panel_w) * 0.5
             );
@@ -7301,13 +8212,13 @@ function loc_draw() {
             draw_text(
                 _screen_width * 0.5,
                 _batch_panel_y + 58,
-                "Choose a favored faction for each AI."
+                "Choose a starter identity for each AI."
             );
             draw_set_color(ui_color_muted);
             draw_text(
                 _screen_width * 0.5,
                 _batch_panel_y + 84,
-                "NONE uses the normal adaptable synergy model."
+                "Drafting can remain adaptable or favor the starter's faction."
             );
             var _batch_control_w = floor(
                 (_batch_panel_w - 90) * 0.5
@@ -7317,7 +8228,7 @@ function loc_draw() {
                 + _batch_panel_w - 30 - _batch_control_w;
             draw_set_halign(fa_left);
             _draw_action_button(
-                "P1 FAVOR: " + batch_profile_label(
+                "P1 STARTER: " + batch_profile_label(
                     batch_profile_options[batch_profile_p1_index]
                 ),
                 "batch_cycle_p1",
@@ -7328,7 +8239,7 @@ function loc_draw() {
                 true
             );
             _draw_action_button(
-                "P2 FAVOR: " + batch_profile_label(
+                "P2 STARTER: " + batch_profile_label(
                     batch_profile_options[batch_profile_p2_index]
                 ),
                 "batch_cycle_p2",
@@ -7394,17 +8305,31 @@ function loc_draw() {
                 "SEED: " + (batch_seed_text == ""
                     ? "RANDOM" : batch_seed_text)
             );
-            draw_set_halign(fa_center);
-            draw_set_color(ui_color_muted);
-            draw_text_ext(
-                _screen_width * 0.5,
-                _batch_panel_y + 320,
-                batch_detailed_logs
-                    ? "Detailed mode preserves per-match rules and AI traces, "
-                        + "but is substantially slower."
-                    : "Fast mode writes aggregate checkpoints after every match.",
-                18,
-                _batch_panel_w - 90
+            draw_set_halign(fa_left);
+            _draw_action_button(
+                batch_focused_drafting
+                    ? "DRAFTING: FOCUSED"
+                    : "DRAFTING: ADAPTABLE",
+                "batch_toggle_drafting",
+                _batch_right_x,
+                _batch_panel_y + 259,
+                _batch_control_w,
+                46,
+                true
+            );
+            var _batch_matrix_filter = batch_matrix_filter_options[
+                batch_matrix_filter_index
+            ];
+            draw_set_halign(fa_left);
+            _draw_action_button(
+                "MATRIX FILTER: " + (_batch_matrix_filter == "ALL"
+                    ? "ALL" : batch_profile_label(_batch_matrix_filter)),
+                "batch_cycle_matrix_filter",
+                _batch_left_x,
+                _batch_panel_y + 319,
+                _batch_panel_w - 60,
+                42,
+                true
             );
             draw_set_halign(fa_left);
             _draw_action_button(
@@ -7425,11 +8350,25 @@ function loc_draw() {
                 62,
                 true
             );
+            var _batch_has_checkpoint = file_exists(
+                batch_checkpoint_filename
+            );
+            if (_batch_has_checkpoint) {
+                _draw_action_button(
+                    "RESUME CHECKPOINT",
+                    "batch_resume_checkpoint",
+                    _batch_left_x,
+                    _batch_panel_y + 452,
+                    _batch_panel_w - 60,
+                    46,
+                    true
+                );
+            }
             draw_set_halign(fa_center);
             draw_set_color(ui_color_text);
             draw_text(
                 _screen_width * 0.5,
-                _batch_panel_y + 466,
+                _batch_panel_y + (_batch_has_checkpoint ? 520 : 466),
                 "Selected run: "
                 + string(batch_game_options[batch_game_option_index]) + " pairs / "
                 + string(
@@ -7440,13 +8379,17 @@ function loc_draw() {
                 ) + " games   |   Matrix: "
                 + string(
                     batch_game_options[batch_game_option_index]
-                    * ((array_length(batch_profile_options)
-                        * (array_length(batch_profile_options) + 1)) / 2)
+                    * (_batch_matrix_filter == "ALL"
+                        ? ((array_length(batch_profile_options)
+                            * (array_length(batch_profile_options) + 1)) / 2)
+                        : array_length(batch_profile_options))
                 ) + " pairs / "
                 + string(
                     batch_game_options[batch_game_option_index]
-                    * array_length(batch_profile_options)
-                    * array_length(batch_profile_options)
+                    * (_batch_matrix_filter == "ALL"
+                        ? array_length(batch_profile_options)
+                            * array_length(batch_profile_options)
+                        : (array_length(batch_profile_options) * 2) - 1)
                 ) + " games"
             );
             draw_set_halign(fa_left);
@@ -7471,43 +8414,117 @@ function loc_draw() {
                     _batch_panel_y + _batch_panel_h,
                     "BATCH RESULTS"
                 );
-                draw_set_halign(fa_center);
-                draw_set_color(ui_color_text);
-                draw_text(
-                    _screen_width * 0.5,
-                    _batch_panel_y + 55,
-                    string(_report.completed) + " games processed ("
-                    + string(_report.paired_seeds_per_matchup)
-                    + " per seat matchup) | faction starters "
-                    + (_report.faction_starters_enabled ? "ON" : "OFF")
-                );
-                var _matrix_profiles = ["", "GF", "SP", "CZ"];
+                var _matrix_profiles = ["", "GF", "SP", "CZT", "CZM"];
                 var _matrix_profile_count = array_length(_matrix_profiles);
                 batch_report_page = clamp(
                     batch_report_page,
                     0,
                     _matrix_profile_count
                 );
+                var _batch_meta_x = 10;
+                var _batch_meta_y = _batch_panel_y + 12;
+                var _batch_meta_lines = [];
+                if (batch_report_page == 0) {
+                    _batch_meta_lines = [
+                        "GAMES: " + string(_report.completed) + " / "
+                            + string(_report.total_games),
+                        "PAIRS / MATCHUP: "
+                            + string(_report.paired_seeds_per_matchup),
+                        "MATRIX FILTER: "
+                            + (variable_struct_exists(_report, "matrix_filter")
+                                && _report.matrix_filter != "ALL"
+                                ? batch_profile_label(_report.matrix_filter)
+                                : "ALL"),
+                        "FACTION STARTERS: "
+                            + (_report.faction_starters_enabled ? "ON" : "OFF"),
+                        "DRAFTING: "
+                            + (_report.focused_drafting
+                                ? "FOCUSED" : "ADAPTABLE"),
+                        "BREACHING MUTATION: "
+                            + (variable_struct_exists(
+                                    _report, "breaching_mutation"
+                                ) && _report.breaching_mutation ? "ON" : "OFF"),
+                        "LOADED SHIPS STAY EXHAUSTED: "
+                            + (variable_struct_exists(
+                                    _report, "loaded_ships_exhausted"
+                                ) && _report.loaded_ships_exhausted
+                                    ? "ON" : "OFF")
+                    ];
+                } else {
+                    var _meta_profile = _matrix_profiles[
+                        batch_report_page - 1
+                    ];
+                    var _meta_forced_starter = _meta_profile == "CZT"
+                        ? "loc.quiet_robe"
+                        : (_meta_profile == "CZM"
+                            ? "loc.raven_beak" : undefined);
+                    var _meta_starter = get_identity_starter_config(
+                        batch_profile_faction(_meta_profile),
+                        _meta_forced_starter
+                    );
+                    array_push(_batch_meta_lines, "STARTER DECK");
+                    if (variable_struct_exists(_meta_starter, "deck_ids")) {
+                        for (var _meta_card_index = 0;
+                             _meta_card_index
+                                < array_length(_meta_starter.deck_ids);
+                             _meta_card_index++) {
+                            var _meta_definition = get_card_definition(
+                                _meta_starter.deck_ids[_meta_card_index]
+                            );
+                            array_push(
+                                _batch_meta_lines,
+                                is_undefined(_meta_definition)
+                                    ? string_upper(
+                                        _meta_starter.deck_ids[_meta_card_index]
+                                      )
+                                    : string_upper(_meta_definition.name)
+                            );
+                        }
+                    }
+                }
+                draw_set_font(FNT_METROID);
+                draw_set_halign(fa_left);
+                draw_set_valign(fa_top);
+                draw_set_color(ui_color_muted);
+                for (var _batch_meta_index = 0;
+                     _batch_meta_index < array_length(_batch_meta_lines);
+                     _batch_meta_index++) {
+                    draw_text(
+                        _batch_meta_x,
+                        _batch_meta_y + (_batch_meta_index * 30),
+                        _batch_meta_lines[_batch_meta_index]
+                    );
+                }
+                draw_set_font(-1);
                 var _matrix_profile_color = function(_profile) {
                     switch (_profile) {
                         case "GF": return LOC_COLOR_GF;
                         case "SP": return LOC_COLOR_SP;
-                        case "CZ": return LOC_COLOR_CZ;
+                        case "CZ":
+                        case "CZT":
+                        case "CZM": return LOC_COLOR_CZ;
                         case "BH": return LOC_COLOR_BH;
                         case "PZ": return LOC_COLOR_PZ;
                         default: return LOC_COLOR_NEUTRAL;
                     }
                 };
                 if (batch_report_page == 0) {
-                var _matrix_left = _batch_panel_x + 82;
+                var _matrix_w = min(820, _screen_width - 100);
+                var _matrix_label_w = 72;
+                var _matrix_left = floor(
+                    (_screen_width - _matrix_w) * 0.5
+                );
                 var _matrix_top = _batch_panel_y + 105;
                 var _matrix_cell_w = floor(
-                    (_batch_panel_w - 112) / _matrix_profile_count
+                    (_matrix_w - _matrix_label_w)
+                        / _matrix_profile_count
                 );
-                var _matrix_cell_h = 65;
-                draw_set_color(ui_color_muted);
-                draw_text(_batch_panel_x + 42, _matrix_top - 31, "P2");
-                draw_text(_matrix_left - 37, _matrix_top - 54, "P1");
+                var _matrix_cell_h = max(44, min(
+                    76,
+                    floor((_screen_height - 260) / _matrix_profile_count)
+                ));
+                draw_set_font(FNT_METROID);
+                draw_set_valign(fa_middle);
                 for (var _matrix_col = 0;
                      _matrix_col < _matrix_profile_count;
                      _matrix_col++) {
@@ -7515,12 +8532,13 @@ function loc_draw() {
                     draw_set_color(_matrix_profile_color(
                         _matrix_profiles[_matrix_col]
                     ));
-                    draw_text(
-                        _matrix_left + _matrix_col * _matrix_cell_w
-                            + _matrix_cell_w * 0.5,
-                        _matrix_top - 25,
-                        batch_profile_label(_matrix_profiles[_matrix_col])
-                    );
+                        draw_text(
+                            floor(_matrix_left + _matrix_label_w
+                                + _matrix_col * _matrix_cell_w
+                                + _matrix_cell_w * 0.5),
+                            _matrix_top - 25,
+                            batch_profile_label(_matrix_profiles[_matrix_col])
+                        );
                 }
                 for (var _matrix_row = 0;
                      _matrix_row < _matrix_profile_count;
@@ -7529,12 +8547,12 @@ function loc_draw() {
                     draw_set_color(_matrix_profile_color(
                         _matrix_profiles[_matrix_row]
                     ));
-                    draw_text(
-                        _batch_panel_x + 42,
-                        _matrix_top + _matrix_row * _matrix_cell_h
-                            + _matrix_cell_h * 0.5,
-                        batch_profile_label(_matrix_profiles[_matrix_row])
-                    );
+                        draw_text(
+                            floor(_matrix_left + _matrix_label_w * 0.5),
+                            floor(_matrix_top + _matrix_row * _matrix_cell_h
+                                + _matrix_cell_h * 0.5),
+                            batch_profile_label(_matrix_profiles[_matrix_row])
+                        );
                     for (var _matrix_col = 0;
                          _matrix_col < _matrix_profile_count;
                          _matrix_col++) {
@@ -7562,13 +8580,13 @@ function loc_draw() {
                                 }
                             }
                         }
-                        var _cell_x = _matrix_left
+                        var _cell_x = _matrix_left + _matrix_label_w
                             + _matrix_col * _matrix_cell_w;
                         var _cell_y = _matrix_top
                             + _matrix_row * _matrix_cell_h;
                         draw_set_color(_cell_invalid > 0
                             ? make_color_rgb(105, 31, 38)
-                            : ui_color_panel_alt);
+                            : make_color_rgb(13, 24, 34));
                         draw_rectangle(
                             _cell_x + 2,
                             _cell_y + 2,
@@ -7577,7 +8595,8 @@ function loc_draw() {
                             false
                         );
                         draw_set_color(_cell_invalid > 0
-                            ? ui_color_error : ui_color_line);
+                            ? ui_color_error
+                            : make_color_rgb(46, 70, 86));
                         draw_rectangle(
                             _cell_x + 2,
                             _cell_y + 2,
@@ -7586,51 +8605,102 @@ function loc_draw() {
                             true
                         );
                         var _cell_win_rate = _cell_valid > 0
-                            ? 100 * _cell_p1_wins / _cell_valid : 0;
+                            ? 100 * (
+                                _cell_p1_wins
+                                + (batch_report_raw_win_rate
+                                    ? 0 : _cell_draws * 0.5)
+                            ) / _cell_valid : 0;
                         draw_set_color(_cell_valid > 0
-                            ? merge_color(
-                                c_white,
-                                make_color_rgb(65, 255, 115),
-                                _cell_win_rate / 100
-                            )
+                            ? _batch_win_rate_color(_cell_win_rate)
                             : ui_color_muted);
-                        draw_set_font(FNT_METROID);
-                        draw_set_valign(fa_middle);
-                        var _cell_text_scale = batch_report_show_counts
-                            ? 0.85 : 1.5;
-                        draw_text_transformed(
-                            _cell_x + _matrix_cell_w * 0.5,
-                            _cell_y + _matrix_cell_h * 0.5,
+                        draw_text(
+                            floor(_cell_x + _matrix_cell_w * 0.5),
+                            floor(_cell_y + _matrix_cell_h * 0.38),
                             _cell_valid > 0
-                                ? (batch_report_show_counts
-                                    ? string(_cell_p1_wins) + "/"
-                                        + string(
-                                            _cell_valid
-                                            - _cell_p1_wins
-                                            - _cell_draws
-                                        )
-                                        + " - " + string(_cell_draws)
-                                    : string(floor(_cell_win_rate)) + "%")
-                                : "--",
-                            _cell_text_scale,
-                            _cell_text_scale,
-                            0
+                                ? string_format(_cell_win_rate, 0, 1) + "%"
+                                : "--"
                         );
-                        draw_set_valign(fa_top);
-                        draw_set_font(-1);
+                        if (_cell_valid > 0) {
+                            draw_set_color(make_color_rgb(120, 135, 150));
+                            draw_text_transformed(
+                                floor(_cell_x + _matrix_cell_w * 0.5),
+                                floor(_cell_y + _matrix_cell_h * 0.72),
+                                string(_cell_p1_wins) + "/"
+                                    + string(
+                                        _cell_valid
+                                        - _cell_p1_wins
+                                        - _cell_draws
+                                    )
+                                    + " - " + string(_cell_draws),
+                                0.7,
+                                0.7,
+                                0
+                            );
+                        }
                     }
                 }
-                _draw_action_button(
-                    batch_report_show_counts
-                        ? "SHOW PERCENTAGES"
-                        : "SHOW W/L - D",
-                    "batch_toggle_report_value",
-                    _screen_width * 0.5 - 130,
-                    _batch_panel_y + _batch_panel_h - 108,
-                    260,
-                    42,
-                    true
+                var _overall_top = _matrix_top
+                    + _matrix_profile_count * _matrix_cell_h + 18;
+                draw_set_halign(fa_left);
+                draw_set_color(ui_color_title);
+                draw_set_font(FNT_METROID);
+                draw_text(
+                    _matrix_left + _matrix_label_w,
+                    _overall_top,
+                    "NON-MIRROR WIN RATES"
                 );
+                for (var _overall_profile_index = 0;
+                     _overall_profile_index < _matrix_profile_count;
+                     _overall_profile_index++) {
+                    var _overall_profile =
+                        _matrix_profiles[_overall_profile_index];
+                    var _overall_games = 0;
+                    var _overall_wins = 0;
+                    var _overall_draws = 0;
+                    for (var _overall_result_index = 0;
+                         _overall_result_index < array_length(_report.results);
+                         _overall_result_index++) {
+                        var _overall_result =
+                            _report.results[_overall_result_index];
+                        if (!_overall_result.valid
+                        || _overall_result.p1_profile
+                            == _overall_result.p2_profile) {
+                            continue;
+                        }
+                        var _overall_seat = 0;
+                        if (_overall_result.p1_profile == _overall_profile) {
+                            _overall_seat = 1;
+                        } else if (_overall_result.p2_profile
+                            == _overall_profile) {
+                            _overall_seat = 2;
+                        }
+                        if (_overall_seat == 0) continue;
+                        _overall_games += 1;
+                        _overall_wins += _overall_result.winner
+                            == _overall_seat ? 1 : 0;
+                        _overall_draws += _overall_result.winner == 0 ? 1 : 0;
+                    }
+                    draw_set_color(_matrix_profile_color(_overall_profile));
+                    draw_text(
+                        _matrix_left + _matrix_label_w,
+                        _overall_top + 28 + _overall_profile_index * 24,
+                        batch_profile_label(_overall_profile) + ": "
+                        + (_overall_games > 0
+                            ? string_format(
+                                100 * (
+                                    _overall_wins
+                                    + (batch_report_raw_win_rate
+                                        ? 0 : _overall_draws * 0.5)
+                                ) / _overall_games,
+                                0,
+                                1
+                            ) + "% (" + string(_overall_wins) + "/"
+                                + string(_overall_games) + ")"
+                            : "--")
+                    );
+                }
+                draw_set_font(-1);
+                draw_set_valign(fa_top);
                 } else {
                     var _detail_profile =
                         _matrix_profiles[batch_report_page - 1];
@@ -7642,42 +8712,63 @@ function loc_draw() {
                     var _detail_color = _matrix_profile_color(
                         _detail_profile
                     );
-                    draw_set_halign(fa_center);
                     draw_set_font(FNT_METROID);
                     draw_set_color(_detail_color);
-                    draw_text_transformed(
-                        _screen_width * 0.5,
-                        _batch_panel_y + 96,
-                        batch_profile_label(_detail_profile),
-                        2,
-                        2,
-                        0
+                    draw_set_halign(fa_center);
+                    var _detail_title = batch_profile_label(_detail_profile);
+                    switch (_detail_profile) {
+                        case "":
+                        case "NA": _detail_title = "NEUTRAL"; break;
+                        case "GF":
+                            _detail_title = "GALACTIC FEDERATION";
+                            break;
+                        case "SP": _detail_title = "SPACE PIRATES"; break;
+                        case "CZT": _detail_title = "CHOZO - THOHA"; break;
+                        case "CZM": _detail_title = "CHOZO - MAWKIN"; break;
+                    }
+                    // Native font scale keeps every pixel crisp.
+                    draw_text(
+                        floor(_screen_width * 0.5),
+                        floor(_batch_panel_y + 42),
+                        _detail_title
                     );
-                    draw_set_font(-1);
                     draw_set_color(ui_color_text);
                     draw_text(
                         _screen_width * 0.5,
-                        _batch_panel_y + 145,
+                        _batch_panel_y + 82,
                         string(_detail.games) + " games  |  "
                         + string(_detail.wins) + "-"
                         + string(_detail.losses) + "-"
-                        + string(_detail.draws) + "  |  Point rate "
+                        + string(_detail.draws) + "  |  "
+                        + (batch_report_raw_win_rate
+                            ? "Win rate " : "Point rate ")
                         + string_format(
-                            100 * (_detail.wins + _detail.draws * 0.5)
+                            100 * (
+                                _detail.wins
+                                + (batch_report_raw_win_rate
+                                    ? 0 : _detail.draws * 0.5)
+                            )
                                 / _detail_games,
                             0,
                             1
                         ) + "%"
                     );
-                    var _detail_left = _batch_panel_x + 70;
-                    var _detail_mid = _screen_width * 0.5;
-                    var _detail_right = _batch_panel_x + _batch_panel_w - 70;
-                    var _detail_top = _batch_panel_y + 190;
+                    var _detail_left = _batch_panel_x + 34;
+                    var _detail_right = _batch_panel_x + _batch_panel_w - 34;
+                    var _detail_top = _batch_panel_y + 126;
                     draw_set_halign(fa_left);
+                    // Fixed columns prevent long labels or headings from
+                    // pushing into their neighbors.
+                    var _detail_behavior_w = 285;
+                    var _detail_research_x = _batch_panel_x + 330;
+                    var _detail_matchup_x = _batch_panel_x + 680;
+                    var _top_definition = get_card_definition(
+                        _detail.top_card_id
+                    );
                     draw_set_color(ui_color_title);
                     draw_text(_detail_left, _detail_top, "BEHAVIOR PER GAME");
                     draw_set_color(ui_color_text);
-                    draw_text(
+                    draw_text_ext(
                         _detail_left,
                         _detail_top + 34,
                         "Research: " + string_format(
@@ -7701,9 +8792,29 @@ function loc_draw() {
                         + "\nPeak CP: " + string_format(
                             _detail.max_cp / _detail_games, 0, 2
                         )
+                        + "\nMost taken: " + (is_undefined(_top_definition)
+                            ? "None"
+                            : _top_definition.name + " ("
+                                + string(_detail.top_card_count) + ")")
+                        + "\nRaid win rate: " + string_format(
+                            100 * _detail.raid_wins / max(1, _detail.raids),
+                            0,
+                            1
+                        ) + "%"
+                        + "\nBreach frequency: 1 / " + string_format(
+                            _detail.games / max(1, _detail.breaches),
+                            0,
+                            1
+                        ) + " games",
+                        28,
+                        _detail_behavior_w
                     );
                     draw_set_color(ui_color_title);
-                    draw_text(_detail_mid - 70, _detail_top, "RESEARCH BY METROID");
+                    draw_text(
+                        _detail_research_x,
+                        _detail_top,
+                        "RESEARCH BY METROID"
+                    );
                     var _detail_stage_names = [
                         "Larva", "Alpha", "Gamma", "Zeta", "Omega", "Hunter"
                     ];
@@ -7718,12 +8829,12 @@ function loc_draw() {
                             + (_detail_stage < 5 ? "\n" : "");
                     }
                     draw_text(
-                        _detail_mid - 70,
+                        _detail_research_x,
                         _detail_top + 34,
                         _detail_stage_text
                     );
                     draw_set_color(ui_color_title);
-                    draw_text(_detail_right - 235, _detail_top, "MATCHUPS");
+                    draw_text(_detail_matchup_x, _detail_top, "MATCHUPS");
                     draw_set_color(ui_color_text);
                     var _detail_matchup_text = "";
                     for (var _detail_opponent = 0;
@@ -7735,7 +8846,9 @@ function loc_draw() {
                             _matrix_profiles[_detail_opponent]
                         ) + ": " + (_opponent_games > 0
                             ? string_format(
-                                100 * _detail.opponent_points[_detail_opponent]
+                                100 * (batch_report_raw_win_rate
+                                    ? _detail.opponent_wins[_detail_opponent]
+                                    : _detail.opponent_points[_detail_opponent])
                                     / _opponent_games,
                                 0,
                                 1
@@ -7746,34 +8859,22 @@ function loc_draw() {
                                 : "");
                     }
                     draw_text(
-                        _detail_right - 235,
+                        _detail_matchup_x,
                         _detail_top + 34,
                         _detail_matchup_text
                     );
-                    var _top_definition = get_card_definition(
-                        _detail.top_card_id
-                    );
-                    draw_set_halign(fa_center);
-                    draw_set_color(ui_color_muted);
-                    draw_text(
-                        _screen_width * 0.5,
-                        _batch_panel_y + _batch_panel_h - 118,
-                        "Most taken: " + (is_undefined(_top_definition)
-                            ? "None"
-                            : _top_definition.name + " ("
-                                + string(_detail.top_card_count) + ")")
-                        + "  |  Won " + string_format(
-                            100 * _detail.raid_wins / max(1, _detail.raids),
-                            0,
-                            1
-                        ) + "% of initiated raids"
-                        + "  |  One breach every " + string_format(
-                            _detail.games / max(1, _detail.breaches),
-                            0,
-                            1
-                        ) + " games"
-                    );
                 }
+                _draw_action_button(
+                    batch_report_raw_win_rate
+                        ? "SHOW POINT RATE"
+                        : "SHOW RAW WIN RATE",
+                    "batch_toggle_report_value",
+                    _screen_width * 0.5 - 130,
+                    _batch_panel_y + _batch_panel_h - 108,
+                    260,
+                    42,
+                    true
+                );
                 _draw_action_button(
                     "< PREVIOUS",
                     "batch_report_previous",
@@ -7810,7 +8911,7 @@ function loc_draw() {
         draw_set_color(ui_color_menu_background);
         draw_rectangle(0, 0, _screen_width, _screen_height, false);
         var _lobby_w = min(760, _screen_width - 96);
-        var _lobby_h = 520;
+        var _lobby_h = min(600, _screen_height - 64);
         var _lobby_x = floor((_screen_width - _lobby_w) * 0.5);
         var _lobby_y = floor((_screen_height - _lobby_h) * 0.5);
         draw_set_color(ui_color_menu_panel);
@@ -7848,7 +8949,7 @@ function loc_draw() {
             _lobby_y + 132,
             net_status
         );
-        if (net_role == "client") {
+        if (net_role == "client" && net_local_participant_id < 0) {
             draw_set_color(ui_color_muted);
             draw_text(_screen_width * 0.5, _lobby_y + 160, "PLAYER NAME");
             draw_set_color(ui_color_panel_alt);
@@ -7941,22 +9042,114 @@ function loc_draw() {
                 net_join_field != ""
             );
         } else {
+            draw_set_halign(fa_left);
+            draw_set_valign(fa_top);
+            var _local_lobby_index = network_find_participant(
+                net_local_participant_id
+            );
+            var _local_lobby_seat = _local_lobby_index >= 0
+                ? net_lobby_participants[_local_lobby_index].seat : -1;
+            for (var _lobby_seat = 0; _lobby_seat < 2; _lobby_seat++) {
+                var _seat_y = _lobby_y + 155 + (_lobby_seat * 92);
+                var _seat_occupant_index = -1;
+                for (var _seat_participant = 0;
+                     _seat_participant < array_length(net_lobby_participants);
+                     _seat_participant++) {
+                    if (net_lobby_participants[_seat_participant].seat
+                    == _lobby_seat) {
+                        _seat_occupant_index = _seat_participant;
+                        break;
+                    }
+                }
+                draw_set_color(ui_color_panel_alt);
+                draw_rectangle(
+                    _lobby_x + 30, _seat_y,
+                    _lobby_x + _lobby_w - 30, _seat_y + 76, false
+                );
+                draw_set_color(ui_color_line);
+                draw_rectangle(
+                    _lobby_x + 30, _seat_y,
+                    _lobby_x + _lobby_w - 30, _seat_y + 76, true
+                );
+                draw_set_color(ui_color_title);
+                draw_set_font(FNT_METROID);
+                draw_text(
+                    _lobby_x + 48, _seat_y + 14,
+                    "PLAYER " + string(_lobby_seat + 1)
+                );
+                draw_set_font(-1);
+                if (_seat_occupant_index >= 0) {
+                    var _seat_occupant = net_lobby_participants[
+                        _seat_occupant_index
+                    ];
+                    draw_set_color(ui_color_text);
+                    draw_text(
+                        _lobby_x + 190, _seat_y + 14,
+                        _seat_occupant.name
+                            + (_seat_occupant.host ? "  [HOST]" : "")
+                    );
+                    draw_set_color(_seat_occupant.ready
+                        ? ui_color_success : ui_color_muted);
+                    draw_text(
+                        _lobby_x + 190, _seat_y + 42,
+                        string_upper(_seat_occupant.leader_id)
+                            + "  /  "
+                            + (_seat_occupant.ready ? "READY" : "NOT READY")
+                    );
+                    if (_seat_occupant.id == net_local_participant_id) {
+                        _draw_action_button(
+                            "DECK", "network_lobby_leader",
+                            _lobby_x + _lobby_w - 202, _seat_y + 10,
+                            74, 26, true
+                        );
+                        _draw_action_button(
+                            _seat_occupant.ready ? "UNREADY" : "READY",
+                            "network_lobby_ready",
+                            _lobby_x + _lobby_w - 120, _seat_y + 10,
+                            90, 26, true
+                        );
+                    }
+                } else {
+                    draw_set_color(ui_color_muted);
+                    draw_text(_lobby_x + 190, _seat_y + 28, "OPEN SEAT");
+                    _draw_action_button(
+                        "CLAIM", "network_lobby_claim_" + string(_lobby_seat),
+                        _lobby_x + _lobby_w - 120, _seat_y + 22,
+                        90, 32, true
+                    );
+                }
+            }
+            var _spectator_names = "";
+            for (var _spectator_index = 0;
+                 _spectator_index < array_length(net_lobby_participants);
+                 _spectator_index++) {
+                var _spectator = net_lobby_participants[_spectator_index];
+                if (_spectator.seat < 0) {
+                    if (_spectator_names != "") _spectator_names += ", ";
+                    _spectator_names += _spectator.name;
+                }
+            }
             draw_set_color(ui_color_muted);
             draw_text(
-                _screen_width * 0.5,
-                _lobby_y + 208,
-                "Hosting as " + net_player_name
+                _lobby_x + 36, _lobby_y + 356,
+                "SPECTATORS: "
+                    + (_spectator_names == "" ? "NONE" : _spectator_names)
             );
-            draw_text(
-                _screen_width * 0.5,
-                _lobby_y + 248,
-                "Give Player 2 your LAN or public IPv4 address."
-            );
-            draw_text(
-                _screen_width * 0.5,
-                _lobby_y + 280,
-                "TCP port " + string(net_port)
-            );
+            if (_local_lobby_seat >= 0) {
+                _draw_action_button(
+                    "SPECTATE", "network_lobby_spectate",
+                    _lobby_x + 170, _lobby_y + _lobby_h - 62,
+                    130, 38, true
+                );
+            }
+            if (net_role == "host") {
+                _draw_action_button(
+                    "START MATCH", "network_lobby_start",
+                    _lobby_x + _lobby_w - 184,
+                    _lobby_y + _lobby_h - 62,
+                    160, 38, true
+                );
+            }
         }
         draw_set_halign(fa_left);
         draw_set_valign(fa_top);
@@ -8137,21 +9330,37 @@ function loc_draw() {
                     break;
 
                 case "raid":
-                    var _tooltip_raid_cost = get_raid_cost(_tooltip_player);
                     _tooltip_title = "RAID";
-                    _tooltip_body = "Pay " + string(_tooltip_raid_cost)
-                        + " CP and exhaust this Ship to attack an opposing Ship. "
+                    _tooltip_body = "Pay CP equal to the target's highest carried Hazard, or its current Security if empty, and exhaust this Ship to attack it. "
                         + "Both players may contribute ready Characters. Win to capture its Metroid if you have room.";
-                    if (_tooltip_player.command_points < _tooltip_raid_cost) {
-                        _tooltip_unavailable = "not enough CP";
-                    } else if (is_undefined(_tooltip_source)) {
+                    var _tooltip_has_raid_target = false;
+                    var _tooltip_raid_opponent = game_state.players[
+                        1 - game_state.active_player
+                    ];
+                    for (var _tooltip_raid_target_index = 0;
+                         _tooltip_raid_target_index
+                            < array_length(_tooltip_raid_opponent.board.ships);
+                         _tooltip_raid_target_index++) {
+                        if (_tooltip_player.command_points >= get_raid_cost(
+                            _tooltip_player,
+                            _tooltip_raid_opponent.board.ships[
+                                _tooltip_raid_target_index
+                            ]
+                        )) {
+                            _tooltip_has_raid_target = true;
+                            break;
+                        }
+                    }
+                    if (is_undefined(_tooltip_source)) {
                         _tooltip_unavailable = "no Ship selected";
                     } else if (!_tooltip_source.ready) {
                         _tooltip_unavailable = "Ship exhausted";
                     } else if (array_length(
-                        game_state.players[1 - game_state.active_player].board.ships
+                        _tooltip_raid_opponent.board.ships
                     ) <= 0) {
                         _tooltip_unavailable = "no valid targets";
+                    } else if (!_tooltip_has_raid_target) {
+                        _tooltip_unavailable = "not enough CP";
                     }
                     break;
 
@@ -8252,7 +9461,43 @@ function loc_draw() {
                     break;
 
                 default:
-                    if (string_pos("activate_", _tooltip_action) == 1
+                    if (string_pos("raid_target_", _tooltip_action) == 1) {
+                        var _tooltip_target_index = real(string_delete(
+                            _tooltip_action,
+                            1,
+                            string_length("raid_target_")
+                        ));
+                        var _tooltip_target_player = game_state.players[
+                            1 - game_state.active_player
+                        ];
+                        if (_tooltip_target_index >= 0
+                        && _tooltip_target_index < array_length(
+                            _tooltip_target_player.board.ships
+                        )) {
+                            var _tooltip_target_ship =
+                                _tooltip_target_player.board.ships[
+                                    _tooltip_target_index
+                                ];
+                            var _tooltip_target_cost = get_raid_cost(
+                                _tooltip_player,
+                                _tooltip_target_ship
+                            );
+                            _tooltip_title = "RAID "
+                                + _tooltip_target_ship.definition.name;
+                            _tooltip_body = "Pay "
+                                + string(_tooltip_target_cost)
+                                + " CP, then select one of your ready Ships to attack this target.";
+                            if (!_tooltip_region.enabled) {
+                                _tooltip_unavailable = _tooltip_player.command_points
+                                    < _tooltip_target_cost
+                                    ? "not enough CP" : "no ready ships";
+                            }
+                        }
+                    }
+                    var _tooltip_is_ability_action =
+                        string_pos("activate_", _tooltip_action) == 1
+                        || string_pos("raid_use_", _tooltip_action) == 1;
+                    if (_tooltip_is_ability_action
                     && !is_undefined(_tooltip_source)) {
                         var _tooltip_ability_index = real(
                             string_delete(_tooltip_action, 1, 9)
@@ -8279,7 +9524,10 @@ function loc_draw() {
                                 case "prepare_gf_double": _tooltip_body = "Double the next Galactic Federation activated effect you use this turn."; break;
                                 case "ped_strength": _tooltip_body = "Remove a Phazon token from this Character to gain Strength this turn."; break;
                             }
-                            if (_tooltip_player.command_points
+                            var _tooltip_ability_player = game_state.players[
+                                _tooltip_source.controller
+                            ];
+                            if (_tooltip_ability_player.command_points
                                 < _tooltip_ability.cost_cp) {
                                 _tooltip_unavailable = "not enough CP";
                             } else if (_tooltip_ability.cost_exhaust

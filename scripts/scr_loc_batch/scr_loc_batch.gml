@@ -1,6 +1,11 @@
 function loc_batch() {
     batch_profile_label = function(_profile) {
-        return _profile == "" ? "NONE" : _profile;
+        return _profile == "" ? "NA" : _profile;
+    };
+
+    batch_profile_faction = function(_profile) {
+        return (_profile == "CZT" || _profile == "CZM")
+            ? "CZ" : _profile;
     };
 
     batch_array_total = function(_values) {
@@ -14,6 +19,7 @@ function loc_batch() {
     };
 
     batch_count_owned_faction = function(_player, _faction) {
+        _faction = batch_profile_faction(_faction);
         if (_faction == "") {
             return 0;
         }
@@ -118,7 +124,7 @@ function loc_batch() {
     };
 
     batch_build_profile_report = function(_batch, _profile) {
-        var _profiles = ["", "GF", "SP", "CZ"];
+        var _profiles = ["", "GF", "SP", "CZT", "CZM"];
         var _report = {
             profile: _profile,
             games: 0,
@@ -134,6 +140,7 @@ function loc_batch() {
             metroids: 0,
             metroid_research: [0, 0, 0, 0, 0, 0],
             opponent_games: array_create(array_length(_profiles), 0),
+            opponent_wins: array_create(array_length(_profiles), 0),
             opponent_points: array_create(array_length(_profiles), 0),
             card_ids: [],
             card_counts: [],
@@ -177,6 +184,8 @@ function loc_batch() {
                  _profile_index++) {
                 if (_profiles[_profile_index] == _opponent) {
                     _report.opponent_games[_profile_index] += 1;
+                    _report.opponent_wins[_profile_index] +=
+                        _result.winner == _seat ? 1 : 0;
                     _report.opponent_points[_profile_index] +=
                         _result.winner == 0 ? 0.5
                             : (_result.winner == _seat ? 1 : 0);
@@ -267,7 +276,6 @@ function loc_batch() {
         var _matchup = _batch.matchups[_matchup_index];
         var _p1_deck = _leg == 0 ? "A" : "B";
         var _p2_deck = _leg == 0 ? "B" : "A";
-        var _starting_deck = _seed_index mod 2 == 0 ? "A" : "B";
         var _fallback_seed = _batch.seed_base + _pair_index;
         return {
             pair_index: _pair_index,
@@ -288,19 +296,76 @@ function loc_batch() {
             deck_b_starter_id: batch_identity_starter_id(
                 _matchup[1], _fallback_seed, "B"
             ),
-            starting_deck: _starting_deck,
-            first_player: _starting_deck == _p1_deck ? 1 : 2
+            starting_deck: _p1_deck,
+            first_player: 1
         };
     };
 
-    batch_identity_starter_id = function(_profile, _seed, _deck_key) {
-        if (_profile == "CZ") {
-            var _chozo_offset = _deck_key == "B" ? 1 : 0;
-            return (abs(floor(_seed)) + _chozo_offset) mod 2 == 0
-                ? "loc.quiet_robe"
-                : "loc.raven_beak";
+    batch_checkpoint_filename = "loc_batch_checkpoint.json";
+
+    batch_delete_checkpoint = function() {
+        if (file_exists(batch_checkpoint_filename)) {
+            file_delete(batch_checkpoint_filename);
         }
-        return get_identity_starter_config(_profile, undefined).starter_id;
+    };
+
+    batch_write_checkpoint = function() {
+        if (!variable_global_exists("loc_batch_state")) return false;
+        var _checkpoint_file = file_text_open_write(
+            batch_checkpoint_filename
+        );
+        if (_checkpoint_file < 0) return false;
+        file_text_write_string(
+            _checkpoint_file,
+            json_stringify(global.loc_batch_state)
+        );
+        file_text_close(_checkpoint_file);
+        return true;
+    };
+
+    batch_resume_checkpoint = function() {
+        if (!file_exists(batch_checkpoint_filename)) return false;
+        var _checkpoint_file = file_text_open_read(
+            batch_checkpoint_filename
+        );
+        if (_checkpoint_file < 0) return false;
+        var _checkpoint_text = "";
+        while (!file_text_eof(_checkpoint_file)) {
+            _checkpoint_text += file_text_read_string(_checkpoint_file);
+            file_text_readln(_checkpoint_file);
+        }
+        file_text_close(_checkpoint_file);
+        try {
+            var _restored_batch = json_parse(_checkpoint_text);
+            if (!variable_struct_exists(_restored_batch, "schedule")
+            || !variable_struct_exists(_restored_batch, "results")
+            || _restored_batch.completed >= _restored_batch.total_games) {
+                return false;
+            }
+            global.loc_batch_state = _restored_batch;
+            global.loc_batch_active = true;
+            global.loc_batch_show_results = false;
+            show_debug_message(
+                "[BATCH] Resuming checkpoint at match "
+                + string(_restored_batch.completed + 1) + "/"
+                + string(_restored_batch.total_games) + "."
+            );
+            return batch_prepare_next_room();
+        } catch (_checkpoint_error) {
+            show_debug_message(
+                "[BATCH] Could not resume checkpoint: "
+                + string(_checkpoint_error)
+            );
+            return false;
+        }
+    };
+
+    batch_identity_starter_id = function(_profile, _seed, _deck_key) {
+        if (_profile == "CZT") return "loc.quiet_robe";
+        if (_profile == "CZM") return "loc.raven_beak";
+        return get_identity_starter_config(
+            batch_profile_faction(_profile), undefined
+        ).starter_id;
     };
 
     batch_write_results_csv = function() {
@@ -317,7 +382,9 @@ function loc_batch() {
             "match,pair_id,leg,seed,deck_a_profile,deck_b_profile,"
             + "p1_deck,p2_deck,starting_deck,winner_deck,"
             + "first_player,p1_profile,p2_profile,winner,turns,mutation,"
-            + "faction_starters,p1_starter,p2_starter,"
+            + "faction_starters,focused_drafting,breaching_mutation,"
+            + "loaded_ships_exhausted,"
+            + "p1_starter,p2_starter,"
             + "p1_research,p2_research,p1_cp,p2_cp,p1_profile_cards,"
             + "valid,invalid_reason,replay_log,p2_profile_cards,"
             + "p1_owned_cards,p2_owned_cards,captures,"
@@ -355,6 +422,9 @@ function loc_batch() {
                 + string(_result.turns) + ","
                 + string(_result.mutation) + ","
                 + string(_result.faction_starters) + ","
+                + string(_result.focused_drafting) + ","
+                + string(_result.breaching_mutation) + ","
+                + string(_result.loaded_ships_exhausted) + ","
                 + _result.p1_starter + ","
                 + _result.p2_starter + ","
                 + string(_result.p1_research) + ","
@@ -438,9 +508,18 @@ function loc_batch() {
             + string(_batch.games_per_matchup)
             + " | Completed: " + string(_batch.completed)
             + "/" + string(_batch.total_games) + "\n"
+            + "Matrix filter: "
+            + (variable_struct_exists(_batch, "matrix_filter")
+                && _batch.matrix_filter != "ALL"
+                ? batch_profile_label(_batch.matrix_filter) : "ALL") + "\n"
             + "Faction starters: "
             + (_batch.faction_starters_enabled ? "ENABLED" : "DISABLED")
-            + "\n"
+            + " | Drafting: "
+            + (_batch.focused_drafting ? "FOCUSED" : "ADAPTABLE")
+            + " | Breaching Mutation: "
+            + (_batch.breaching_mutation ? "ENABLED" : "DISABLED")
+            + " | Loaded Ships Stay Exhausted: "
+            + (_batch.loaded_ships_exhausted ? "ENABLED" : "DISABLED") + "\n"
             + "Total pairs: " + string(_batch.total_pairs) + "\n"
             + "Raw CSV: " + get_export_display_path(_batch.csv_path) + "\n\n"
         );
@@ -498,12 +577,14 @@ function loc_batch() {
                         : _result.p1_profile_cards;
                     if (_result.leg == 1) {
                         var _other_winner = "";
-                        var _other_index = _result_index + 1;
-                        if (_other_index < array_length(_batch.results)) {
+                        for (var _other_index = 0;
+                             _other_index < array_length(_batch.results);
+                             _other_index++) {
                             var _other = _batch.results[_other_index];
                             if (_other.pair_id == _result.pair_id
                             && _other.leg == 2) {
                                 _other_winner = _other.winner_deck;
+                                break;
                             }
                         }
                         if (_result.winner_deck == "A"
@@ -537,13 +618,13 @@ function loc_batch() {
                     + string(_games) + " valid games | invalid "
                     + string(_invalid_games) + "\n"
                     + "  Deck A " + batch_profile_label(_matchup[0])
-                    + ": slot 1 wins " + string(_a_p1_wins)
-                    + " | slot 2 wins " + string(_a_p2_wins)
-                    + " | both-seat sweeps " + string(_a_sweeps) + "\n"
+                    + ": first-player wins " + string(_a_p1_wins)
+                    + " | second-player wins " + string(_a_p2_wins)
+                    + " | paired sweeps " + string(_a_sweeps) + "\n"
                     + "  Deck B " + batch_profile_label(_matchup[1])
-                    + ": slot 1 wins " + string(_b_p1_wins)
-                    + " | slot 2 wins " + string(_b_p2_wins)
-                    + " | both-seat sweeps " + string(_b_sweeps) + "\n"
+                    + ": first-player wins " + string(_b_p1_wins)
+                    + " | second-player wins " + string(_b_p2_wins)
+                    + " | paired sweeps " + string(_b_sweeps) + "\n"
                     + "  Split pairs " + string(_splits)
                     + " | draw/mixed pairs " + string(_mixed_pairs)
                     + " | drawn games " + string(_draws)
@@ -566,8 +647,8 @@ function loc_batch() {
                 );
             }
         }
-        var _profiles = ["", "GF", "SP", "CZ"];
-        file_text_write_string(_file, "PROFILE SLOT RESULTS\n");
+        var _profiles = ["", "GF", "SP", "CZT", "CZM"];
+        file_text_write_string(_file, "PROFILE TURN-ORDER RESULTS\n");
         for (var _profile_index = 0;
              _profile_index < array_length(_profiles);
              _profile_index++) {
@@ -588,12 +669,14 @@ function loc_batch() {
                     && _result.p2_profile == _profile ? 1 : 0;
                 if (_result.leg == 1 && _result.winner_deck != "") {
                     var _other_winner = "";
-                    var _other_index = _result_index + 1;
-                    if (_other_index < array_length(_batch.results)) {
+                    for (var _other_index = 0;
+                         _other_index < array_length(_batch.results);
+                         _other_index++) {
                         var _other = _batch.results[_other_index];
                         if (_other.pair_id == _result.pair_id
                         && _other.leg == 2) {
                             _other_winner = _other.winner_deck;
+                            break;
                         }
                     }
                     var _winner_profile = _result.winner_deck == "A"
@@ -607,10 +690,10 @@ function loc_batch() {
             file_text_write_string(
                 _file,
                 batch_profile_label(_profile)
-                + ": slot 1 wins " + string(_slot1_wins)
-                + " | slot 2 wins " + string(_slot2_wins)
+                + ": first-player wins " + string(_slot1_wins)
+                + " | second-player wins " + string(_slot2_wins)
                 + " | total wins " + string(_slot1_wins + _slot2_wins)
-                + " | both-seat sweeps " + string(_profile_sweeps) + "\n"
+                + " | paired sweeps " + string(_profile_sweeps) + "\n"
             );
         }
         file_text_close(_file);
@@ -629,13 +712,21 @@ function loc_batch() {
     };
 
     start_batch_run = function(_matrix_mode) {
-        var _profiles = ["", "GF", "SP", "CZ"];
+        var _profiles = ["", "GF", "SP", "CZT", "CZM"];
         var _matchups = [];
+        var _matrix_filter = batch_matrix_filter_options[
+            batch_matrix_filter_index
+        ];
         if (_matrix_mode) {
             for (var _left = 0; _left < array_length(_profiles); _left++) {
                 for (var _right = _left;
                      _right < array_length(_profiles);
                      _right++) {
+                    if (_matrix_filter != "ALL"
+                    && _profiles[_left] != _matrix_filter
+                    && _profiles[_right] != _matrix_filter) {
+                        continue;
+                    }
                     array_push(
                         _matchups,
                         [_profiles[_left], _profiles[_right]]
@@ -661,6 +752,10 @@ function loc_batch() {
             : real(batch_seed_text);
         var _schedule = [];
         var _pair_id = 0;
+        // Pair metadata is canonical and independent of execution order. This
+        // keeps swapped-seat games on the same seed even though each leg runs
+        // in a different Player 1 block.
+        var _pair_records = [];
         for (var _schedule_matchup_index = 0;
              _schedule_matchup_index < array_length(_matchups);
              _schedule_matchup_index++) {
@@ -671,57 +766,70 @@ function loc_batch() {
                 var _schedule_pair_index = _pair_id;
                 _pair_id += 1;
                 var _schedule_seed = _batch_seed_base + _schedule_pair_index;
-                var _schedule_starting_deck =
-                    _schedule_seed_index mod 2 == 0 ? "A" : "B";
                 var _deck_a_starter_id = batch_identity_starter_id(
                     _schedule_matchup[0], _schedule_seed, "A"
                 );
                 var _deck_b_starter_id = batch_identity_starter_id(
                     _schedule_matchup[1], _schedule_seed, "B"
                 );
-                array_push(_schedule, {
+                array_push(_pair_records, {
                     pair_index: _schedule_pair_index,
                     pair_id: _schedule_pair_index + 1,
-                    leg: 1,
                     matchup_index: _schedule_matchup_index,
                     seed_index: _schedule_seed_index,
                     seed: _schedule_seed,
                     deck_a_profile: _schedule_matchup[0],
                     deck_b_profile: _schedule_matchup[1],
-                    p1_deck: "A",
-                    p2_deck: "B",
-                    p1_profile: _schedule_matchup[0],
-                    p2_profile: _schedule_matchup[1],
                     deck_a_starter_id: _deck_a_starter_id,
-                    deck_b_starter_id: _deck_b_starter_id,
-                    starting_deck: _schedule_starting_deck,
-                    first_player: _schedule_starting_deck == "A" ? 1 : 2
+                    deck_b_starter_id: _deck_b_starter_id
                 });
-                // Identical profiles have no distinct mirrored configuration.
-                if (_schedule_matchup[0] != _schedule_matchup[1]) {
+            }
+        }
+        // Execute top-to-bottom within each Player 1 column, then advance to
+        // the next Player 1 profile. Checkpoints are written between columns.
+        for (var _p1_profile_index = 0;
+             _p1_profile_index < array_length(_profiles);
+             _p1_profile_index++) {
+            var _p1_profile = _profiles[_p1_profile_index];
+            for (var _p2_profile_index = 0;
+                 _p2_profile_index < array_length(_profiles);
+                 _p2_profile_index++) {
+                var _p2_profile = _profiles[_p2_profile_index];
+                for (var _record_index = 0;
+                     _record_index < array_length(_pair_records);
+                     _record_index++) {
+                    var _record = _pair_records[_record_index];
+                    var _is_leg_one = _record.deck_a_profile == _p1_profile
+                        && _record.deck_b_profile == _p2_profile;
+                    var _is_leg_two = _record.deck_a_profile == _p2_profile
+                        && _record.deck_b_profile == _p1_profile
+                        && _record.deck_a_profile != _record.deck_b_profile;
+                    if (!_is_leg_one && !_is_leg_two) continue;
                     array_push(_schedule, {
-                        pair_index: _schedule_pair_index,
-                        pair_id: _schedule_pair_index + 1,
-                        leg: 2,
-                        matchup_index: _schedule_matchup_index,
-                        seed_index: _schedule_seed_index,
-                        seed: _schedule_seed,
-                        deck_a_profile: _schedule_matchup[0],
-                        deck_b_profile: _schedule_matchup[1],
-                        p1_deck: "B",
-                        p2_deck: "A",
-                        p1_profile: _schedule_matchup[1],
-                        p2_profile: _schedule_matchup[0],
-                        deck_a_starter_id: _deck_a_starter_id,
-                        deck_b_starter_id: _deck_b_starter_id,
-                        starting_deck: _schedule_starting_deck,
-                        first_player: _schedule_starting_deck == "B" ? 1 : 2
+                        pair_index: _record.pair_index,
+                        pair_id: _record.pair_id,
+                        leg: _is_leg_one ? 1 : 2,
+                        matchup_index: _record.matchup_index,
+                        seed_index: _record.seed_index,
+                        seed: _record.seed,
+                        deck_a_profile: _record.deck_a_profile,
+                        deck_b_profile: _record.deck_b_profile,
+                        p1_deck: _is_leg_one ? "A" : "B",
+                        p2_deck: _is_leg_one ? "B" : "A",
+                        p1_profile: _p1_profile,
+                        p2_profile: _p2_profile,
+                        deck_a_starter_id: _record.deck_a_starter_id,
+                        deck_b_starter_id: _record.deck_b_starter_id,
+                        starting_deck: _is_leg_one ? "A" : "B",
+                        first_player: 1
                     });
                 }
             }
         }
+        batch_delete_checkpoint();
         global.loc_batch_state = {
             mode: _matrix_mode ? "matrix" : "matchup",
+            matrix_filter: _matrix_mode ? _matrix_filter : "ALL",
             matchups: _matchups,
             schedule: _schedule,
             games_per_matchup: _paired_seeds * 2,
@@ -732,6 +840,10 @@ function loc_batch() {
             seed_base: _batch_seed_base,
             results: [],
             faction_starters_enabled: faction_starters_enabled,
+            focused_drafting: batch_focused_drafting,
+            breaching_mutation: settings_experimental_breaching_mutation,
+            loaded_ships_exhausted:
+                settings_experimental_loaded_ships_exhausted,
             detailed_logs: batch_detailed_logs,
             replay_active: false,
             replay_index: -1,
@@ -741,6 +853,7 @@ function loc_batch() {
                 + "loc_batch_" + _stamp + "_summary.txt"
         };
         batch_write_results_csv();
+        batch_write_checkpoint();
         return batch_prepare_next_room();
     };
 
@@ -752,8 +865,12 @@ function loc_batch() {
         game_state.game_mode = "batch";
         game_state.players[0].is_ai = true;
         game_state.players[1].is_ai = true;
-        game_state.players[0].favored_faction = _schedule.p1_profile;
-        game_state.players[1].favored_faction = _schedule.p2_profile;
+        game_state.players[0].favored_faction = batch_profile_faction(
+            _schedule.p1_profile
+        );
+        game_state.players[1].favored_faction = batch_profile_faction(
+            _schedule.p2_profile
+        );
         game_state.players[0].name = "AI " + _schedule.p1_deck + " "
             + batch_profile_label(_schedule.p1_profile);
         game_state.players[1].name = "AI " + _schedule.p2_deck + " "
@@ -762,25 +879,72 @@ function loc_batch() {
             _batch,
             "faction_starters_enabled"
         ) ? _batch.faction_starters_enabled : false;
-        var _p1_batch_starter_id = _schedule.p1_deck == "A"
-            ? _schedule.deck_a_starter_id
-            : _schedule.deck_b_starter_id;
-        var _p2_batch_starter_id = _schedule.p2_deck == "A"
-            ? _schedule.deck_a_starter_id
-            : _schedule.deck_b_starter_id;
+        settings_experimental_breaching_mutation = variable_struct_exists(
+            _batch,
+            "breaching_mutation"
+        ) && _batch.breaching_mutation;
+        settings_experimental_loaded_ships_exhausted = variable_struct_exists(
+            _batch,
+            "loaded_ships_exhausted"
+        ) && _batch.loaded_ships_exhausted;
+        var _deck_a_player = _schedule.p1_deck == "A"
+            ? game_state.players[0]
+            : game_state.players[1];
+        var _deck_b_player = _schedule.p1_deck == "B"
+            ? game_state.players[0]
+            : game_state.players[1];
+        // Bootstrap deals the neutral starters in seat order before the batch
+        // identities are known. Rebuild canonical pools so even the NONE deck
+        // does not inherit a different pre-shuffle ordering after seats swap.
+        _deck_a_player.hand = [];
+        _deck_a_player.deck = expand_card_pool(
+            card_database.pools.starter,
+            _deck_a_player.index,
+            "deck"
+        );
+        _deck_b_player.hand = [];
+        _deck_b_player.deck = expand_card_pool(
+            card_database.pools.starter,
+            _deck_b_player.index,
+            "deck"
+        );
+        // Keep each persistent deck on the same RNG stream in both legs.
+        // Seat-order initialization would give A and B different opening hands
+        // after they swap, weakening paired-seed comparisons.
         apply_identity_starter(
-            game_state.players[0],
+            _deck_a_player,
             false,
-            _p1_batch_starter_id
+            _schedule.deck_a_starter_id
         );
         apply_identity_starter(
-            game_state.players[1],
+            _deck_b_player,
             false,
-            _p2_batch_starter_id
+            _schedule.deck_b_starter_id
         );
+        var _focused_drafting = variable_struct_exists(
+            _batch,
+            "focused_drafting"
+        ) && _batch.focused_drafting;
+        game_state.players[0].favored_faction = _focused_drafting
+            ? batch_profile_faction(_schedule.p1_profile) : "";
+        game_state.players[1].favored_faction = _focused_drafting
+            ? batch_profile_faction(_schedule.p2_profile) : "";
         game_state.active_player = _schedule.first_player - 1;
         game_state.priority_player = game_state.active_player;
         game_state.view_player = game_state.active_player;
+        for (var _opening_event_index = 0;
+             _opening_event_index < array_length(game_state.event_log);
+             _opening_event_index++) {
+            if (string_pos(
+                "takes the first turn.",
+                game_state.event_log[_opening_event_index]
+            ) > 0) {
+                game_state.event_log[_opening_event_index] =
+                    game_state.players[game_state.active_player].name
+                    + " takes the first turn.";
+                break;
+            }
+        }
         title_menu_active = false;
         handoff_active = false;
         ai_action_delay = 0;
@@ -816,12 +980,14 @@ function loc_batch() {
             batch_write_results_csv();
             if (_batch.completed >= _batch.total_games) {
                 batch_write_summary();
+                batch_delete_checkpoint();
                 global.loc_batch_active = false;
                 global.loc_batch_last_summary = _batch.summary_path;
                 global.loc_batch_show_results = true;
                 room_restart();
                 return true;
             }
+            batch_write_checkpoint();
             return batch_prepare_next_room();
         }
         var _schedule = batch_get_schedule_info(_batch.completed);
@@ -849,9 +1015,12 @@ function loc_batch() {
                 starting_deck: _schedule.starting_deck,
                 winner_deck: _winner_deck,
                 first_player: _schedule.first_player,
-                p1_profile: _p0.favored_faction,
-                p2_profile: _p1.favored_faction,
+                p1_profile: _schedule.p1_profile,
+                p2_profile: _schedule.p2_profile,
                 faction_starters: faction_starters_enabled,
+                focused_drafting: _batch.focused_drafting,
+                breaching_mutation: _batch.breaching_mutation,
+                loaded_ships_exhausted: _batch.loaded_ships_exhausted,
                 p1_starter: _p0.identity_starter_id,
                 p2_starter: _p1.identity_starter_id,
                 winner: _winner_slot,
@@ -863,14 +1032,14 @@ function loc_batch() {
                 p2_cp: _p1.command_points,
                 p1_profile_cards: batch_count_owned_faction(
                     _p0,
-                    _p0.favored_faction
+                    _schedule.p1_profile
                 ),
                 valid: batch_match_invalid_reason == "",
                 invalid_reason: batch_match_invalid_reason,
                 replay_log: "",
                 p2_profile_cards: batch_count_owned_faction(
                     _p1,
-                    _p1.favored_faction
+                    _schedule.p2_profile
                 ),
                 p1_owned_cards: batch_count_owned_cards(_p0),
                 p2_owned_cards: batch_count_owned_cards(_p1),
@@ -897,6 +1066,7 @@ function loc_batch() {
         }
         if (_batch.completed >= _batch.total_games) {
             batch_write_summary();
+            batch_delete_checkpoint();
             global.loc_batch_active = false;
             global.loc_batch_last_summary = _batch.summary_path;
             global.loc_batch_show_results = true;
@@ -907,6 +1077,17 @@ function loc_batch() {
             );
             room_restart();
             return true;
+        }
+        var _finished_schedule = _schedule;
+        var _next_schedule = batch_get_schedule_info(_batch.completed);
+        if (_finished_schedule.p1_profile != _next_schedule.p1_profile) {
+            batch_write_checkpoint();
+            show_debug_message(
+                "[BATCH] Checkpoint saved after Player 1 "
+                + batch_profile_label(_finished_schedule.p1_profile)
+                + " block (" + string(_batch.completed) + "/"
+                + string(_batch.total_games) + ")."
+            );
         }
         return batch_prepare_next_room();
     };

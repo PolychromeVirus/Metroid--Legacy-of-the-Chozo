@@ -11,7 +11,12 @@ function loc_developer_ui() {
     settings_debug_mode = false;
     settings_context_help = true;
     settings_first_game_guidance = true;
+    settings_experimental_breaching_mutation = false;
+    settings_experimental_loaded_ships_exhausted = false;
     settings_menu_active = false;
+    title_settings_scroll = 0;
+    title_settings_scroll_max = 0;
+    title_last_hover_key = "";
 
     save_persistent_settings = function() {
         settings_saved_player_name = net_player_name;
@@ -24,6 +29,10 @@ function loc_developer_ui() {
         ini_write_real("debug", "enabled", settings_debug_mode);
         ini_write_real("help", "contextual", settings_context_help);
         ini_write_real("help", "first_game", settings_first_game_guidance);
+        ini_write_real("experimental", "breaching_mutation",
+            settings_experimental_breaching_mutation);
+        ini_write_real("experimental", "loaded_ships_exhausted",
+            settings_experimental_loaded_ships_exhausted);
         ini_write_string("player", "name", net_player_name);
         ini_write_string("player", "name_two", title_player_two_name);
         ini_close();
@@ -47,6 +56,12 @@ function loc_developer_ui() {
         settings_context_help = ini_read_real("help", "contextual", 1) >= 1;
         settings_first_game_guidance = ini_read_real(
             "help", "first_game", 1
+        ) >= 1;
+        settings_experimental_breaching_mutation = ini_read_real(
+            "experimental", "breaching_mutation", 0
+        ) >= 1;
+        settings_experimental_loaded_ships_exhausted = ini_read_real(
+            "experimental", "loaded_ships_exhausted", 0
         ) >= 1;
         settings_saved_player_name = ini_read_string(
             "player", "name", "Player 1"
@@ -197,6 +212,7 @@ function loc_developer_ui() {
     ui_hover_action_has_context = false;
     context_button_source_kind = "";
     context_button_source_index = -1;
+    context_button_source_instance = undefined;
     ui_screen_width = 1920;
     ui_screen_height = 1080;
     // Board geometry is authored once at the original 1080p composition. Window
@@ -260,7 +276,7 @@ function loc_developer_ui() {
         },
         {
             title: "CP / ACTIONS",
-            summary: "Command Points, or CP, pay for most actions. Your current CP is shown in the HUD. Costs are paid immediately, and an action cannot begin if you cannot afford it.\n\nReserve acquires a Shop card for its Reserve cost. Deploy pays a Shop card's Deploy cost and puts it directly onto your board. Capture costs 1 CP and exhausts a Ship. Raid costs 2 CP and uses one of your ready Ships to attack. Refresh Hand costs 1 CP and replaces selected cards; Refresh Shop costs 1 CP and replaces the market.\n\nSalvage discards one of your ready permanents and grants half its printed Reserve cost, rounded down. Activated card abilities state their own costs. Hover an action for its exact effect; unavailable actions include a short reason such as not enough CP or no valid targets."
+            summary: "Command Points, or CP, pay for most actions. Your current CP is shown in the HUD. Costs are paid immediately, and an action cannot begin if you cannot afford it.\n\nReserve acquires a Shop card for its Reserve cost. Deploy pays a Shop card's Deploy cost and puts it directly onto your board. Capture costs 1 CP and exhausts a Ship. A Raid's cost depends on its target. Refresh Hand costs 1 CP and replaces selected cards; Refresh Shop costs 1 CP and replaces the market.\n\nSalvage discards one of your ready permanents and grants half its printed Reserve cost, rounded down. Activated card abilities state their own costs. Hover an action for its exact effect; unavailable actions include a short reason such as not enough CP or no valid targets."
         },
         {
             title: "CAPTURE",
@@ -272,7 +288,7 @@ function loc_developer_ui() {
         },
         {
             title: "RAIDS",
-            summary: "Raid pays 2 CP and selects one of your ready Ships to attack an opposing Ship. The attacker and defender begin with their Ships' Strength, then may contribute eligible Characters. The attacker commits first; the defender responds afterward. Contributing cards exhaust.\n\nBoth sides may use eligible Raid abilities before resolution. The raid display shows the currently known Attack and Defense totals. The higher total wins; a tie destroys both Ships.\n\nWhen the attacker wins, it may capture a Metroid carried by the defending Ship if capacity permits. If cargo cannot be taken, follow the prompted overflow choice. Raiding can therefore steal Research in transit, force valuable defenders to exhaust, or remove an important Ship even when no cargo is present."
+            summary: "Raid begins from the button beneath an opposing Ship, then asks you to select one of your ready Ships as the attacker. Raiding an empty Ship costs CP equal to its current Security. If it carries Metroids, the Raid instead costs CP equal to the highest Hazard among them. The attacker and defender begin with their Ships' Strength, then may contribute eligible Characters. The attacker commits first; the defender responds afterward. Contributing cards exhaust.\n\nBoth sides may use eligible Raid abilities before resolution. The raid display shows the currently known Attack and Defense totals. The higher total wins; a tie destroys both Ships.\n\nWhen the attacker wins, it may capture a Metroid carried by the defending Ship if capacity permits. If cargo cannot be taken, follow the prompted overflow choice. Raiding can therefore steal Research in transit, force valuable defenders to exhaust, or remove an important Ship even when no cargo is present."
         },
         {
             title: "METROIDS",
@@ -406,6 +422,11 @@ function loc_developer_ui() {
     net_server = -1;
     net_socket = -1;
     net_peer_socket = -1;
+    net_client_sockets = [];
+    net_lobby_participants = [];
+    net_lobby_seat_count = 2;
+    net_local_participant_id = -1;
+    net_next_participant_id = 1;
     net_leader_id = "bsl_researcher";
     net_player_name = settings_saved_player_name;
     title_player_two_name = settings_saved_player_two_name;
@@ -450,20 +471,25 @@ function loc_developer_ui() {
     && global.loc_batch_show_results) {
         batch_menu_active = true;
     }
-    batch_profile_options = ["", "GF", "SP", "CZ"];
+    batch_profile_options = ["", "GF", "SP", "CZT", "CZM"];
     batch_profile_p1_index = 0;
     batch_profile_p2_index = 0;
+    batch_matrix_filter_options = ["ALL", "", "GF", "SP", "CZT", "CZM"];
+    batch_matrix_filter_index = 0;
     batch_game_options = [1, 10, 50, 100, 500];
     batch_game_option_index = 1;
-    batch_detailed_logs = false;
+    batch_focused_drafting = false;
+    batch_detailed_logs = true;
     batch_match_steps = 0;
     batch_match_invalid_reason = "";
     batch_seed_text = "";
     batch_seed_editing = false;
-    batch_report_show_counts = false;
+    batch_report_raw_win_rate = false;
     batch_report_page = 0;
     net_join_field = "";
     network_local_player = 0;
+    spectator_hands_visible = false;
+    spectator_hand_peek_amount = 0;
     net_command_sequence = 0;
     net_last_applied_sequence = 0;
     ai_next_step_time = 0;
@@ -472,6 +498,7 @@ function loc_developer_ui() {
     ai_salvage_goal_instance_id = -1;
     ai_salvage_goal_mode = "";
     ai_trace_log = [];
+    balance_journal_lines = [];
     balance_live_event_count = 0;
     balance_live_ai_count = 0;
 
@@ -486,7 +513,9 @@ function loc_developer_ui() {
             + " " + string_upper(game_state.phase) + "] "
             + string(_message);
         array_push(ai_trace_log, _trace_line);
-        show_debug_message(_trace_line);
+        if (game_state.game_mode != "batch") {
+            show_debug_message(_trace_line);
+        }
         if (!title_menu_active) {
             try {
                 sync_balance_live_log();
@@ -498,6 +527,14 @@ function loc_developer_ui() {
             }
         }
     };
+    if (variable_global_exists("loc_batch_active")
+    && global.loc_batch_active
+    && variable_global_exists("loc_batch_state")) {
+        // Apply the scheduled seats and opening player before resolving any
+        // opening phases. Otherwise bootstrap grants Player 1 its income,
+        // then a swapped leg hands Player 2 an already-started action phase.
+        configure_batch_room();
+    }
     game_state.phase = "containment";
     skip_empty_lab_containment();
     array_push(
@@ -522,39 +559,69 @@ function loc_developer_ui() {
     if (variable_global_exists("loc_network_resume")
     && global.loc_network_resume) {
         global.loc_network_resume = false;
+        if (variable_global_exists("loc_network_breaching_mutation")) {
+            settings_experimental_breaching_mutation =
+                global.loc_network_breaching_mutation;
+        }
+        if (variable_global_exists("loc_network_loaded_ships_exhausted")) {
+            settings_experimental_loaded_ships_exhausted =
+                global.loc_network_loaded_ships_exhausted;
+        }
         net_role = global.loc_network_role;
         net_socket = global.loc_network_socket;
         net_peer_socket = global.loc_network_socket;
         net_server = global.loc_network_server;
-        network_local_player = net_role == "host" ? 0 : 1;
+        net_client_sockets = variable_global_exists("loc_network_client_sockets")
+            ? global.loc_network_client_sockets : [];
+        net_local_participant_id = variable_global_exists(
+            "loc_network_participant_id"
+        ) ? global.loc_network_participant_id : -1;
+        net_lobby_participants = variable_global_exists(
+            "loc_network_lobby_snapshot"
+        ) ? global.loc_network_lobby_snapshot : [];
+        network_local_player = -1;
+        for (var _resume_participant_index = 0;
+             _resume_participant_index < array_length(net_lobby_participants);
+             _resume_participant_index++) {
+            var _resume_participant = net_lobby_participants[
+                _resume_participant_index
+            ];
+            if (_resume_participant.id == net_local_participant_id) {
+                network_local_player = _resume_participant.seat;
+                break;
+            }
+        }
         game_state.game_mode = "network";
-        game_state.players[0].name = global.loc_network_host_name;
-        game_state.players[1].name = global.loc_network_guest_name;
-        apply_leader_identity(
-            game_state.players[0],
-            global.loc_network_host_leader
-        );
-        apply_leader_identity(
-            game_state.players[1],
-            global.loc_network_guest_leader
-        );
-        game_state.players[0].name = global.loc_network_host_name;
-        game_state.players[1].name = global.loc_network_guest_name;
-        game_state.view_player = network_local_player;
+        for (var _resume_seat = 0; _resume_seat < 2; _resume_seat++) {
+            for (var _resume_lobby_index = 0;
+                 _resume_lobby_index < array_length(net_lobby_participants);
+                 _resume_lobby_index++) {
+                var _resume_seated = net_lobby_participants[
+                    _resume_lobby_index
+                ];
+                if (_resume_seated.seat == _resume_seat) {
+                    game_state.players[_resume_seat].name = _resume_seated.name;
+                    apply_leader_identity(
+                        game_state.players[_resume_seat],
+                        _resume_seated.leader_id
+                    );
+                    game_state.players[_resume_seat].name = _resume_seated.name;
+                    break;
+                }
+            }
+        }
+        game_state.view_player = network_local_player >= 0
+            ? network_local_player : 0;
         title_menu_active = false;
         network_lobby_active = false;
         handoff_active = false;
-        net_status = "Connected as Player "
-            + string(network_local_player + 1) + ".";
+        net_status = network_local_player >= 0
+            ? "Connected as Player " + string(network_local_player + 1) + "."
+            : "Connected as Spectator.";
         show_debug_message(
             "[NET] Match resumed as " + net_role + " with seed "
             + string(game_seed) + "."
         );
-    }
-    if (variable_global_exists("loc_batch_active")
-    && global.loc_batch_active
-    && variable_global_exists("loc_batch_state")) {
-        configure_batch_room();
     }
     show_debug_message(
         "Game setup: "

@@ -420,6 +420,114 @@ function loc_actions() {
         return true;
     };
 
+    begin_back_in_the_day_choice = function(_player) {
+        var _owned_definition_ids = [];
+        var _owned_zones = [
+            _player.deck,
+            _player.hand,
+            _player.discard,
+            _player.board.characters,
+            _player.board.ships,
+            _player.board.locations
+        ];
+        for (var _owned_zone_index = 0;
+             _owned_zone_index < array_length(_owned_zones);
+             _owned_zone_index++) {
+            var _owned_zone = _owned_zones[_owned_zone_index];
+            for (var _owned_card_index = 0;
+                 _owned_card_index < array_length(_owned_zone);
+                 _owned_card_index++) {
+                var _owned_id = _owned_zone[_owned_card_index].definition_id;
+                if (!raid_array_contains(_owned_definition_ids, _owned_id)) {
+                    array_push(_owned_definition_ids, _owned_id);
+                }
+            }
+        }
+        for (var _removed_index = 0;
+             _removed_index < array_length(game_state.removed_cards);
+             _removed_index++) {
+            var _removed_card = game_state.removed_cards[_removed_index];
+            if (_removed_card.controller != _player.index) continue;
+            if (!raid_array_contains(
+                _owned_definition_ids,
+                _removed_card.definition_id
+            )) {
+                array_push(
+                    _owned_definition_ids,
+                    _removed_card.definition_id
+                );
+            }
+        }
+        var _candidate_ids = [];
+        var _candidate_names = [];
+        for (var _shop_deck_index = 0;
+             _shop_deck_index < array_length(game_state.shop_deck);
+             _shop_deck_index++) {
+            var _shop_search_card = game_state.shop_deck[_shop_deck_index];
+            if (!raid_array_contains(
+                _owned_definition_ids,
+                _shop_search_card.definition_id
+            ) || raid_array_contains(
+                _candidate_ids,
+                _shop_search_card.definition_id
+            )) continue;
+            array_push(_candidate_ids, _shop_search_card.definition_id);
+            array_push(_candidate_names, _shop_search_card.definition.name);
+        }
+        if (array_length(_candidate_ids) <= 0) {
+            array_push(
+                game_state.event_log,
+                "Back In the Day found no matching card in the Shop deck."
+            );
+            return true;
+        }
+        pending_choice = {
+            kind: "back_in_the_day",
+            player_index: _player.index,
+            candidate_ids: _candidate_ids,
+            candidate_names: _candidate_names,
+            page: 0,
+            prompt: "Choose a matching card from the Shop deck to add to your discard pile."
+        };
+        return true;
+    };
+
+    resolve_back_in_the_day_choice = function(_candidate_index) {
+        if (is_undefined(pending_choice)
+        || pending_choice.kind != "back_in_the_day"
+        || _candidate_index < 0
+        || _candidate_index >= array_length(pending_choice.candidate_ids)) {
+            return false;
+        }
+        var _player = game_state.players[pending_choice.player_index];
+        var _definition_id = pending_choice.candidate_ids[_candidate_index];
+        for (var _shop_index = 0;
+             _shop_index < array_length(game_state.shop_deck);
+             _shop_index++) {
+            var _found_card = game_state.shop_deck[_shop_index];
+            if (_found_card.definition_id != _definition_id) continue;
+            array_delete(game_state.shop_deck, _shop_index, 1);
+            clear_card_board_state(_found_card);
+            _found_card.controller = _player.index;
+            _found_card.zone = "discard";
+            array_push(_player.discard, _found_card);
+            shuffle_array(game_state.shop_deck);
+            array_push(
+                game_state.event_log,
+                _player.name + " found " + _found_card.definition.name
+                    + " with Back In the Day and added it to their discard pile."
+            );
+            pending_choice = undefined;
+            return true;
+        }
+        array_push(
+            game_state.event_log,
+            "Back In the Day's selected card was no longer in the Shop deck."
+        );
+        pending_choice = undefined;
+        return true;
+    };
+
     resolve_event_effect = function(_player, _card) {
         switch (_card.definition_id) {
             case "starter.orders_received":
@@ -511,6 +619,10 @@ function loc_actions() {
                     game_state.event_log,
                     "Hive Mind Communication granted 2 CP and spread Phazon."
                 );
+                break;
+
+            case "loc.back_in_the_day":
+                begin_back_in_the_day_choice(_player);
                 break;
 
             case "lop.hyper_mode":
@@ -646,38 +758,54 @@ function loc_actions() {
                 game_state.event_log,
                 _player.name + " played " + _card.definition.name + "."
             );
-            resolve_event_effect(_player, _card);
-            var _event_was_destroyed = _card.definition_id == "loc.torizo";
-            var _event_visual_until = current_time + 360;
-            clear_card_board_state(_card);
-            if (_event_was_destroyed) {
-                queue_card_destruction(_card, "hand");
+            var _event_removed_before_resolution =
+                _card.definition_id == "loc.back_in_the_day";
+            if (_event_removed_before_resolution) {
+                clear_card_board_state(_card);
                 _card.zone = "removed";
                 array_push(game_state.removed_cards, _card);
                 array_push(
                     game_state.event_log,
-                    "Torizo was destroyed and removed from the game."
+                    _card.definition.name + " was removed from the game."
                 );
+            }
+            resolve_event_effect(_player, _card);
+            var _event_was_destroyed = _card.definition_id == "loc.torizo";
+            var _event_visual_until = current_time + 360;
+            if (_event_removed_before_resolution) {
+                queue_card_destruction(_card, "hand");
             } else {
-                _card.zone = "discard";
-                if (game_state.game_mode != "batch"
-                && _player.index == game_state.view_player) {
-                    _card.ui_hide_until_ms = _event_visual_until;
-                    array_push(presentation_card_transits, {
-                        card: _card,
-                        player_index: _player.index,
-                        kind: "hand_event_to_discard",
-                        start_x: _card.ui_x,
-                        start_y: _card.ui_y,
-                        started_at_ms: current_time,
-                        duration_ms: 360
-                    });
+                clear_card_board_state(_card);
+                if (_event_was_destroyed) {
+                    queue_card_destruction(_card, "hand");
+                    _card.zone = "removed";
+                    array_push(game_state.removed_cards, _card);
+                    array_push(
+                        game_state.event_log,
+                        "Torizo was destroyed and removed from the game."
+                    );
+                } else {
+                    _card.zone = "discard";
+                    if (game_state.game_mode != "batch"
+                    && _player.index == game_state.view_player) {
+                        _card.ui_hide_until_ms = _event_visual_until;
+                        array_push(presentation_card_transits, {
+                            card: _card,
+                            player_index: _player.index,
+                            kind: "hand_event_to_discard",
+                            start_x: _card.ui_x,
+                            start_y: _card.ui_y,
+                            started_at_ms: current_time,
+                            duration_ms: 360
+                        });
+                    }
+                    array_push(_player.discard, _card);
+                    array_push(
+                        game_state.event_log,
+                        _card.definition.name
+                            + " was discarded after its Event resolved."
+                    );
                 }
-                array_push(_player.discard, _card);
-                array_push(
-                    game_state.event_log,
-                    _card.definition.name + " was discarded after its Event resolved."
-                );
             }
             var _event_hand_count_before_draw = array_length(_player.hand);
             draw_from_deck(_player, 1);
