@@ -1,4 +1,14 @@
 function loc_batch() {
+    batch_profile_brain = function(_profile) {
+        switch (_profile) {
+            case "GF": return "commander";
+            case "SP": return "pirate";
+            case "CZT": return "elder";
+            case "CZM": return "warrior";
+            default: return "neutral";
+        }
+    };
+
     batch_profile_label = function(_profile) {
         return _profile == "" ? "NA" : _profile;
     };
@@ -30,7 +40,8 @@ function loc_batch() {
             _player.discard,
             _player.board.characters,
             _player.board.ships,
-            _player.board.locations
+            _player.board.locations,
+            _player.board.relics
         ];
         for (var _zone_index = 0;
              _zone_index < array_length(_zones);
@@ -53,7 +64,8 @@ function loc_batch() {
             + array_length(_player.discard)
             + array_length(_player.board.characters)
             + array_length(_player.board.ships)
-            + array_length(_player.board.locations);
+            + array_length(_player.board.locations)
+            + array_length(_player.board.relics);
     };
 
     batch_player_telemetry_snapshot = function(_player) {
@@ -382,7 +394,7 @@ function loc_batch() {
             "match,pair_id,leg,seed,deck_a_profile,deck_b_profile,"
             + "p1_deck,p2_deck,starting_deck,winner_deck,"
             + "first_player,p1_profile,p2_profile,winner,turns,mutation,"
-            + "faction_starters,focused_drafting,breaching_mutation,"
+            + "faction_starters,focused_drafting,deck_brains,breaching_mutation,"
             + "loaded_ships_exhausted,"
             + "p1_starter,p2_starter,"
             + "p1_research,p2_research,p1_cp,p2_cp,p1_profile_cards,"
@@ -423,6 +435,8 @@ function loc_batch() {
                 + string(_result.mutation) + ","
                 + string(_result.faction_starters) + ","
                 + string(_result.focused_drafting) + ","
+                + string(variable_struct_exists(_result, "deck_brains")
+                    && _result.deck_brains) + ","
                 + string(_result.breaching_mutation) + ","
                 + string(_result.loaded_ships_exhausted) + ","
                 + _result.p1_starter + ","
@@ -516,6 +530,9 @@ function loc_batch() {
             + (_batch.faction_starters_enabled ? "ENABLED" : "DISABLED")
             + " | Drafting: "
             + (_batch.focused_drafting ? "FOCUSED" : "ADAPTABLE")
+            + " | Deck Brains: "
+            + (variable_struct_exists(_batch, "deck_brains")
+                && _batch.deck_brains ? "ENABLED" : "NEUTRAL")
             + " | Breaching Mutation: "
             + (_batch.breaching_mutation ? "ENABLED" : "DISABLED")
             + " | Loaded Ships Stay Exhausted: "
@@ -841,6 +858,7 @@ function loc_batch() {
             results: [],
             faction_starters_enabled: faction_starters_enabled,
             focused_drafting: batch_focused_drafting,
+            deck_brains: batch_deck_brains,
             breaching_mutation: settings_experimental_breaching_mutation,
             loaded_ships_exhausted:
                 settings_experimental_loaded_ships_exhausted,
@@ -929,6 +947,19 @@ function loc_batch() {
             ? batch_profile_faction(_schedule.p1_profile) : "";
         game_state.players[1].favored_faction = _focused_drafting
             ? batch_profile_faction(_schedule.p2_profile) : "";
+        var _deck_brains = variable_struct_exists(_batch, "deck_brains")
+            && _batch.deck_brains;
+        game_state.players[0].ai_brain = _deck_brains
+            ? batch_profile_brain(_schedule.p1_profile) : "neutral";
+        game_state.players[1].ai_brain = _deck_brains
+            ? batch_profile_brain(_schedule.p2_profile) : "neutral";
+        array_push(
+            game_state.event_log,
+            "Batch brains: P1 " + game_state.players[0].ai_brain
+                + " / P2 " + game_state.players[1].ai_brain
+                + (_deck_brains ? " (deck brains enabled)."
+                    : " (neutral control).")
+        );
         game_state.active_player = _schedule.first_player - 1;
         game_state.priority_player = game_state.active_player;
         game_state.view_player = game_state.active_player;
@@ -1019,6 +1050,8 @@ function loc_batch() {
                 p2_profile: _schedule.p2_profile,
                 faction_starters: faction_starters_enabled,
                 focused_drafting: _batch.focused_drafting,
+                deck_brains: variable_struct_exists(_batch, "deck_brains")
+                    && _batch.deck_brains,
                 breaching_mutation: _batch.breaching_mutation,
                 loaded_ships_exhausted: _batch.loaded_ships_exhausted,
                 p1_starter: _p0.identity_starter_id,

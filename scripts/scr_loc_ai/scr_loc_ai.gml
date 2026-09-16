@@ -2,6 +2,96 @@ function loc_ai() {
     ai_eval_cache_active = false;
     ai_eval_utility_cache = {};
     ai_planner_collecting = false;
+    ai_brain_key = function(_player) {
+        return variable_struct_exists(_player, "ai_brain")
+            ? _player.ai_brain : "neutral";
+    };
+
+    ai_difficulty_key = function() {
+        // Test and balance infrastructure retains the exact full-strength
+        // evaluator so historical reports and regression expectations remain
+        // comparable. Difficulty is a player-facing local-match setting.
+        if (game_state.game_mode == "regression"
+        || game_state.game_mode == "batch") return "commander";
+        if (!variable_instance_exists(id, "ai_difficulty_keys")) {
+            return "tactical";
+        }
+        return ai_difficulty_keys[clamp(
+            ai_difficulty_index, 0, array_length(ai_difficulty_keys) - 1
+        )];
+    };
+
+    // Personality is an intentional preference, not hidden rules knowledge.
+    // These small bonuses let two brains disagree about otherwise close moves.
+    ai_personality_card_bonus = function(_card, _player, _profile) {
+        var _brain = ai_brain_key(_player);
+        var _type = _card.definition.type;
+        var _factions = variable_struct_exists(_card.definition, "faction")
+            ? string(_card.definition.faction) : "";
+        switch (_brain) {
+            case "commander":
+                return ai_gf_card_priority(_card, _player, _profile)
+                    + (string_pos("GF", _factions) > 0 ? 0.08 : 0);
+            case "pirate":
+                return ai_sp_card_priority(_card, _player, _profile)
+                    + (card_has_faction(_card, "SP") ? 0.03 : 0);
+            case "elder":
+                return (_profile.metroid ? 0.30 : 0)
+                    + (_profile.buff_security ? 0.22 : 0)
+                    + (_profile.cleanse ? 0.10 : 0)
+                    + (_type == "ship" ? 0.08 : 0);
+            case "warrior":
+                return (_profile.removal ? 0.24 : 0)
+                    + (_profile.buff_strength ? 0.22 : 0)
+                    + (_type == "character" ? 0.10 : 0)
+                    + (string_pos("CZ", _factions) > 0 ? 0.10 : 0);
+            default:
+                return (_profile.economy ? 0.18 : 0)
+                    + (_profile.metroid ? 0.18 : 0)
+                    + (_type == "location" ? 0.12 : 0);
+        }
+    };
+
+    ai_personality_action_bonus = function(_candidate, _player) {
+        var _brain = ai_brain_key(_player);
+        switch (_brain) {
+            case "commander":
+                return ai_gf_action_priority(_candidate, _player);
+            case "pirate":
+                return ai_sp_action_priority(_candidate, _player);
+            case "elder":
+                if (_candidate.kind == "capture") return 0.32;
+                if (_candidate.kind == "raid") return -0.12;
+                break;
+            case "warrior":
+                if (_candidate.kind == "raid") return 0.28;
+                if (_candidate.kind == "ability") return 0.12;
+                break;
+            default:
+                if (_candidate.kind == "capture") return 0.18;
+                if (_candidate.kind == "refresh_hand") return 0.10;
+                if (_candidate.kind == "raid") return -0.06;
+                break;
+        }
+        return 0;
+    };
+
+    ai_apply_brain_and_difficulty = function(_candidates, _player) {
+        var _difficulty = ai_difficulty_key();
+        var _noise = _difficulty == "cadet" ? 0.52
+            : (_difficulty == "tactical" ? 0.16 : 0);
+        for (var _index = 0; _index < array_length(_candidates); _index++) {
+            var _candidate = _candidates[_index];
+            _candidate.value += ai_personality_action_bonus(
+                _candidate, _player
+            );
+            if (_noise > 0) {
+                // Noise is centered: easier brains can mis-rank close legal
+                // choices, but never invent illegal actions.
+                _candidate.value += random_range(-_noise, _noise);
+            }
+        }
+    };
     // AI values are denominated in capture value (CV): 1 CV is the value of
     // safely moving one Research worth of Metroid cargo toward the Lab.  These
     // helpers intentionally derive value from rules-visible state rather than
@@ -232,6 +322,247 @@ function loc_ai() {
             );
     };
 
+    ai_adam_mutation_breach_cost = function() {
+        if (!settings_experimental_breaching_mutation) return 0;
+        if (game_state.mutation >= 7) return 5.00;
+        if (game_state.mutation >= 6) return 2.00;
+        if (game_state.mutation >= 5) return 1.00;
+        return 0.40;
+    };
+
+    ai_adam_cascade_loss = function(
+        _player, _ship_index, _bonus_hazard, _forced_breach
+    ) {
+        var _metroids = array_create(array_length(_player.lab));
+        array_copy(
+            _metroids, 0, _player.lab, 0, array_length(_player.lab)
+        );
+        var _characters = array_create(
+            array_length(_player.board.characters)
+        );
+        array_copy(
+            _characters, 0, _player.board.characters, 0,
+            array_length(_player.board.characters)
+        );
+        var _character_alive = array_create(array_length(_characters), true);
+        var _strength = ai_ready_strength(_player);
+        var _ship_security = 0;
+        var _ship_used = _ship_index >= 0
+            && _ship_index < array_length(_player.board.ships)
+            && _player.board.ships[_ship_index].ready;
+        if (_ship_used) {
+            _ship_security = get_card_stat(
+                _player.board.ships[_ship_index], "containment_ship"
+            );
+        }
+        var _loss = 0;
+        var _breaches = 0;
+        var _forced = _forced_breach;
+
+        while (array_length(_metroids) > 0) {
+            var _hazard = 0;
+            for (var _hazard_index = 0;
+                 _hazard_index < array_length(_metroids);
+                 _hazard_index++) {
+                _hazard += _metroids[_hazard_index].definition.hazard;
+            }
+            _hazard += _bonus_hazard;
+
+            var _breach_index = -1;
+            if (!_ship_used) {
+                for (var _omega_index = array_length(_metroids) - 1;
+                     _omega_index >= 0;
+                     _omega_index--) {
+                    if (_metroids[_omega_index].definition.id
+                    == "metroid.omega") {
+                        _breach_index = _omega_index;
+                        break;
+                    }
+                }
+            }
+            if (_breach_index < 0
+            && (_forced || _hazard > _strength + _ship_security)) {
+                _forced = false;
+                var _highest_stage = -1;
+                for (var _metroid_index = 0;
+                     _metroid_index < array_length(_metroids);
+                     _metroid_index++) {
+                    var _candidate_metroid = _metroids[_metroid_index];
+                    if (_candidate_metroid.definition.id == "metroid.hunter") {
+                        _breach_index = _metroid_index;
+                        break;
+                    }
+                    if (_candidate_metroid.definition.stage > _highest_stage) {
+                        _highest_stage = _candidate_metroid.definition.stage;
+                        _breach_index = _metroid_index;
+                    }
+                }
+            }
+            if (_breach_index < 0) break;
+
+            var _breach = _metroids[_breach_index];
+            _loss += _breach.definition.research_value;
+            _loss += ai_adam_mutation_breach_cost();
+            if (_breach.definition.id == "metroid.hunter") {
+                for (var _hunter_character_index = 0;
+                     _hunter_character_index < array_length(_characters);
+                     _hunter_character_index++) {
+                    if (!_character_alive[_hunter_character_index]) continue;
+                    var _hunter_target = _characters[_hunter_character_index];
+                    _loss += 0.30;
+                    if (_hunter_target.phazon_tokens == 2) _loss += 1.50;
+                }
+            }
+            array_delete(_metroids, _breach_index, 1);
+            _breaches += 1;
+
+            var _casualty_index = -1;
+            var _casualty_value = 100000;
+            for (var _character_index = 0;
+                 _character_index < array_length(_characters);
+                 _character_index++) {
+                if (!_character_alive[_character_index]) continue;
+                var _casualty = _characters[_character_index];
+                var _candidate_value = ai_deployed_intrinsic_value(_casualty)
+                    + ai_removal_raid_delta(_casualty, _player);
+                if (_casualty.definition_id == "loc.adam_malkovich") {
+                    var _casualty_strength = _casualty.ready
+                        ? get_card_stat(
+                            _casualty, "containment_character"
+                        ) : 0;
+                    _candidate_value = max(
+                        _candidate_value,
+                        0.08 + max(0, get_card_stat(_casualty)) * 0.09
+                            + ai_removal_raid_delta(_casualty, _player)
+                            + max(
+                                0,
+                                ai_containment_loss_at(
+                                    _player,
+                                    max(0, ai_ready_strength(_player)
+                                        - _casualty_strength),
+                                    ai_best_ready_ship_security(_player)
+                                ) - ai_lab_failure_cost(_player)
+                            )
+                    );
+                }
+                if (_candidate_value < _casualty_value) {
+                    _casualty_value = _candidate_value;
+                    _casualty_index = _character_index;
+                }
+            }
+            if (_casualty_index >= 0) {
+                var _discarded = _characters[_casualty_index];
+                _character_alive[_casualty_index] = false;
+                _loss += max(0, _casualty_value);
+                if (_discarded.ready) {
+                    _strength = max(
+                        0,
+                        _strength - get_card_stat(
+                            _discarded, "containment_character"
+                        )
+                    );
+                }
+            }
+        }
+        return {
+            loss: _loss,
+            breaches: _breaches,
+            remaining_metroids: array_length(_metroids),
+            remaining_strength: _strength,
+            ship_security: _ship_security
+        };
+    };
+
+    ai_adam_utility = function(_player, _adam, _cascade) {
+        var _body = 0.08 + max(0, get_card_stat(_adam)) * 0.09;
+        var _current_strength = ai_ready_strength(_player);
+        var _adam_strength = _adam.ready
+            ? get_card_stat(_adam, "containment_character") : 0;
+        var _ship_security = ai_best_ready_ship_security(_player);
+        var _with_adam_loss = ai_containment_loss_at(
+            _player, _current_strength, _ship_security
+        );
+        var _without_adam_loss = ai_containment_loss_at(
+            _player,
+            max(0, _current_strength - _adam_strength),
+            _ship_security
+        );
+        var _containment = max(0, _without_adam_loss - _with_adam_loss);
+        var _raid = ai_removal_raid_delta(_adam, _player);
+
+        var _incoming_hazard = 0;
+        for (var _ship_index = 0;
+             _ship_index < array_length(_player.board.ships);
+             _ship_index++) {
+            var _ship = _player.board.ships[_ship_index];
+            for (var _cargo_index = 0;
+                 _cargo_index < array_length(_ship.cargo);
+                 _cargo_index++) {
+                _incoming_hazard += _ship.cargo[_cargo_index].definition.hazard;
+            }
+        }
+        var _future_insurance = 0;
+        if (_incoming_hazard > 0
+        && _incoming_hazard > _cascade.remaining_strength
+            + _cascade.ship_security) {
+            _future_insurance = 0.70 * min(
+                _cascade.loss,
+                _incoming_hazard - _cascade.remaining_strength
+                    - _cascade.ship_security
+            );
+        }
+        return {
+            total: _body + _containment + _raid + _future_insurance,
+            body: _body,
+            containment: _containment,
+            raid: _raid,
+            insurance: _future_insurance
+        };
+    };
+
+    ai_should_use_adam = function(_choice) {
+        var _player = game_state.players[_choice.player_index];
+        var _adam = undefined;
+        for (var _adam_index = 0;
+             _adam_index < array_length(_player.board.characters);
+             _adam_index++) {
+            if (_player.board.characters[_adam_index].definition_id
+            == "loc.adam_malkovich") {
+                _adam = _player.board.characters[_adam_index];
+                break;
+            }
+        }
+        if (is_undefined(_adam)) return false;
+
+        var _bonus_hazard = 0;
+        var _forced_breach = false;
+        if (variable_struct_exists(_choice, "special") && _choice.special
+        && !is_undefined(special_containment_sequence)) {
+            var _entry = special_containment_sequence.entries[
+                special_containment_sequence.index
+            ];
+            _bonus_hazard = _entry.bonus_hazard;
+            _forced_breach = _entry.forced_breach;
+        }
+        var _cascade = ai_adam_cascade_loss(
+            _player, _choice.ship_index, _bonus_hazard, _forced_breach
+        );
+        var _utility = ai_adam_utility(_player, _adam, _cascade);
+        var _use_adam = _cascade.loss > _utility.total;
+        ai_debug_log(
+            "Adam Malkovich: cascade "
+            + string(_cascade.breaches) + " breach(es), loss "
+            + string_format(_cascade.loss, 0, 2) + " CV; Adam utility "
+            + string_format(_utility.total, 0, 2) + " CV (body "
+            + string_format(_utility.body, 0, 2) + ", containment "
+            + string_format(_utility.containment, 0, 2) + ", raid "
+            + string_format(_utility.raid, 0, 2) + ", insurance "
+            + string_format(_utility.insurance, 0, 2) + "); decision: "
+            + (_use_adam ? "DESTROY ADAM." : "ALLOW CASCADE.")
+        );
+        return _use_adam;
+    };
+
     ai_best_other_ship_security = function(_player, _excluded_id) {
         var _best = 0;
         for (var _index = 0;
@@ -281,11 +612,724 @@ function loc_ai() {
         );
     };
 
+    // Galactic Federation strategic model. Roles are deliberately semantic:
+    // the brain cares whether its engine can still perform a job after one key
+    // piece is disrupted, rather than merely counting GF faction symbols.
+    ai_gf_role_counts = function(_player) {
+        var _roles = {
+            economy: 0,
+            containment: 0,
+            fleet: 0,
+            defense: 0
+        };
+        var _zones = [
+            _player.board.characters,
+            _player.board.ships,
+            _player.board.locations,
+            _player.board.relics
+        ];
+        for (var _zone_index = 0;
+             _zone_index < array_length(_zones);
+             _zone_index++) {
+            for (var _card_index = 0;
+                 _card_index < array_length(_zones[_zone_index]);
+                 _card_index++) {
+                var _card = _zones[_zone_index][_card_index];
+                var _profile = ai_effect_profile(_card);
+                if (_profile.economy) _roles.economy += 1;
+                if (_card.definition.type == "character"
+                && get_card_stat(_card, "containment_character") > 0) {
+                    _roles.containment += 1;
+                }
+                if (_card.definition.type == "ship") _roles.fleet += 1;
+                if (_profile.buff_security || _profile.ready
+                || (_card.definition.type == "ship"
+                    && get_card_stat(_card, "raid_defender_ship") > 0)) {
+                    _roles.defense += 1;
+                }
+            }
+        }
+        return _roles;
+    };
+
+    ai_gf_projected_hazard = function(_player) {
+        var _hazard = get_lab_hazard(_player);
+        for (var _ship_index = 0;
+             _ship_index < array_length(_player.board.ships);
+             _ship_index++) {
+            var _cargo = _player.board.ships[_ship_index].cargo;
+            for (var _cargo_index = 0;
+                 _cargo_index < array_length(_cargo);
+                 _cargo_index++) {
+                _hazard += get_lab_metroid_hazard(
+                    _player, _cargo[_cargo_index]
+                );
+            }
+        }
+        return _hazard;
+    };
+
+    ai_gf_enemy_raid_pressure = function(_player) {
+        var _enemy = game_state.players[1 - _player.index];
+        var _best = 0;
+        var _support = ai_ready_strength(_enemy);
+        for (var _ship_index = 0;
+             _ship_index < array_length(_enemy.board.ships);
+             _ship_index++) {
+            var _ship = _enemy.board.ships[_ship_index];
+            if (!_ship.ready || array_length(_ship.cargo) > 0) continue;
+            _best = max(
+                _best,
+                get_card_stat(_ship, "raid_attacker_ship") + _support
+            );
+        }
+        return _best;
+    };
+
+    ai_gf_stability = function(_player) {
+        var _roles = ai_gf_role_counts(_player);
+        var _containment = ai_ready_strength(_player)
+            + ai_best_ready_ship_security(_player);
+        var _hazard = ai_gf_projected_hazard(_player);
+        var _defense = ai_ready_raid_total(_player, "defense", -1);
+        var _enemy_pressure = ai_gf_enemy_raid_pressure(_player);
+        var _loaded_exposure = 0;
+        for (var _ship_index = 0;
+             _ship_index < array_length(_player.board.ships);
+             _ship_index++) {
+            var _ship = _player.board.ships[_ship_index];
+            if (array_length(_ship.cargo) <= 0) continue;
+            if (ai_cargo_survival_probability(_player, _ship) < 0.7) {
+                _loaded_exposure += 1;
+            }
+        }
+        return {
+            roles: _roles,
+            containment_margin: _containment - _hazard,
+            containment_loss: ai_lab_failure_cost(_player),
+            defense_margin: _defense - _enemy_pressure,
+            loaded_exposure: _loaded_exposure,
+            stable: _containment >= _hazard
+                && _defense >= _enemy_pressure
+                && _loaded_exposure <= 0
+        };
+    };
+
+    ai_gf_posture = function(_player) {
+        var _state = ai_gf_stability(_player);
+        if (_state.containment_loss > 0
+        || _state.containment_margin < 0) return "STABILIZE";
+        if (_state.loaded_exposure > 0) return "SECURE";
+        if (_state.defense_margin < 0
+        || _state.roles.fleet <= 0) return "FORTIFY";
+        if (_state.roles.economy < 2) return "DEVELOP";
+        if (ai_gf_enemy_raid_pressure(_player) > 0) return "SUPPRESS";
+        return "EXPLOIT";
+    };
+
+    ai_gf_card_priority = function(_card, _player, _profile) {
+        var _state = ai_gf_stability(_player);
+        var _roles = _state.roles;
+        var _bonus = 0;
+        var _type = _card.definition.type;
+        var _stat = max(0, get_card_stat(_card));
+
+        // Economy is the preferred growth path only after the current engine is
+        // safe. Under pressure, the same investment is still useful but yields
+        // to repairs that restore a failed threshold.
+        if (_profile.economy) {
+            _bonus += _state.stable ? 0.34 : 0.08;
+            if (_roles.economy <= 0) _bonus += 0.16;
+            else if (_roles.economy == 1) _bonus += 0.08;
+        }
+        if (_type == "character" && _stat > 0) {
+            if (_state.containment_margin < 0) _bonus += 0.34;
+            else if (_state.containment_margin < 2) _bonus += 0.18;
+            if (_roles.containment <= 1) _bonus += 0.10;
+        }
+        if (_type == "ship") {
+            if (_roles.fleet <= 0) _bonus += 0.36;
+            else if (_roles.fleet == 1) _bonus += 0.12;
+            if (_state.defense_margin < 0) _bonus += 0.18;
+        }
+        if (_profile.buff_security || _profile.ready) {
+            _bonus += _state.defense_margin < 0 ? 0.28 : 0.12;
+            if (_roles.defense <= 1) _bonus += 0.10;
+        }
+        return _bonus;
+    };
+
+    ai_gf_card_is_critical = function(_card, _player) {
+        var _roles = ai_gf_role_counts(_player);
+        var _profile = ai_effect_profile(_card);
+        if (_profile.economy && _roles.economy <= 1) return true;
+        if (_card.definition.type == "ship" && _roles.fleet <= 1) return true;
+        if (_card.definition.type == "character"
+        && get_card_stat(_card, "containment_character") > 0
+        && _roles.containment <= 1) return true;
+        if ((_profile.buff_security || _profile.ready)
+        && _roles.defense <= 1) return true;
+        return false;
+    };
+
+    ai_gf_action_priority = function(_candidate, _player) {
+        var _state = ai_gf_stability(_player);
+        var _bonus = 0;
+        var _source = undefined;
+        switch (_candidate.kind) {
+            case "ability":
+                _source = get_ability_source(
+                    _candidate.source_kind, _candidate.index
+                );
+                break;
+            case "play":
+                if (_candidate.index >= 0
+                && _candidate.index < array_length(_player.hand)) {
+                    _source = _player.hand[_candidate.index];
+                }
+                break;
+            case "capture":
+            case "raid":
+                if (_candidate.index >= 0
+                && _candidate.index < array_length(_player.board.ships)) {
+                    _source = _player.board.ships[_candidate.index];
+                }
+                break;
+            case "deploy":
+            case "reserve":
+                if (_candidate.index >= 0
+                && _candidate.index < array_length(game_state.shop_row)) {
+                    _source = game_state.shop_row[_candidate.index];
+                }
+                break;
+            case "salvage":
+                _source = get_ability_source(
+                    _candidate.source_kind, _candidate.index
+                );
+                break;
+        }
+
+        if (_candidate.kind == "capture" && !is_undefined(_source)) {
+            // GF captures when it can keep the transport protected; exhausting
+            // the only stabilizing Ship is a meaningful strategic cost.
+            _bonus -= ai_containment_exhaust_cost(_player, _source) * 0.45;
+            if (_state.defense_margin < 0) _bonus -= 0.18;
+            if (_state.loaded_exposure > 0) _bonus -= 0.14;
+        } else if (_candidate.kind == "raid" && !is_undefined(_source)) {
+            var _enemy = game_state.players[1 - _player.index];
+            var _target = _candidate.secondary >= 0
+                && _candidate.secondary < array_length(_enemy.board.ships)
+                ? _enemy.board.ships[_candidate.secondary] : undefined;
+            _bonus -= ai_containment_exhaust_cost(_player, _source) * 0.55;
+            if (!_state.stable) _bonus -= 0.28;
+            if (!is_undefined(_target)) {
+                // A raid earns its place in the GF plan by removing pressure or
+                // securing exposed cargo, not by existing as a legal attack.
+                _bonus += min(
+                    0.28,
+                    ai_board_card_removal_value(_target, _enemy) * 0.10
+                );
+                if (array_length(_target.cargo) > 0) _bonus += 0.10;
+            }
+        } else if (_candidate.kind == "ability"
+        && !is_undefined(_source)) {
+            _bonus -= ai_containment_exhaust_cost(_player, _source) * 0.35;
+            if (ai_gf_card_is_critical(_source, _player)
+            && _state.defense_margin < 0) _bonus -= 0.12;
+        } else if (_candidate.kind == "salvage"
+        && !is_undefined(_source)
+        && ai_gf_card_is_critical(_source, _player)) {
+            _bonus -= 0.75;
+        }
+        return _bonus;
+    };
+
+    // Space Pirate strategic model. It values the set of profitable raids the
+    // whole board currently threatens, then asks how a candidate changes that
+    // frontier. Faction is only a tie-breaker unless an explicit SP interaction
+    // such as Zebesian Pirate or Space Pirate Homeworld is actually present.
+    ai_sp_ready_pirate_count = function(_player) {
+        var _count = 0;
+        var _zones = [
+            _player.board.characters,
+            _player.board.ships,
+            _player.board.locations,
+            _player.board.relics
+        ];
+        for (var _zone_index = 0;
+             _zone_index < array_length(_zones);
+             _zone_index++) {
+            for (var _card_index = 0;
+                 _card_index < array_length(_zones[_zone_index]);
+                 _card_index++) {
+                var _card = _zones[_zone_index][_card_index];
+                if (_card.ready && card_has_faction(_card, "SP")) {
+                    _count += 1;
+                }
+            }
+        }
+        return _count;
+    };
+
+    ai_sp_total_pirate_count = function(_player) {
+        var _count = 0;
+        var _zones = [
+            _player.board.characters,
+            _player.board.ships,
+            _player.board.locations,
+            _player.board.relics
+        ];
+        for (var _zone_index = 0;
+             _zone_index < array_length(_zones);
+             _zone_index++) {
+            for (var _card_index = 0;
+                 _card_index < array_length(_zones[_zone_index]);
+                 _card_index++) {
+                if (card_has_faction(
+                    _zones[_zone_index][_card_index], "SP"
+                )) _count += 1;
+            }
+        }
+        return _count;
+    };
+
+    ai_sp_has_ready_zebesian = function(_player) {
+        for (var _index = 0;
+             _index < array_length(_player.board.characters);
+             _index++) {
+            var _card = _player.board.characters[_index];
+            if (_card.ready
+            && _card.definition_id == "loc.zebesian_pirate") return true;
+        }
+        return false;
+    };
+
+    ai_sp_has_homeworld = function(_player) {
+        for (var _index = 0;
+             _index < array_length(_player.board.locations);
+             _index++) {
+            if (_player.board.locations[_index].definition_id
+            == "loc.space_pirate_homeworld") return true;
+        }
+        return false;
+    };
+
+    ai_sp_research_position = function(_player) {
+        var _value = get_player_research(_player);
+        for (var _ship_index = 0;
+             _ship_index < array_length(_player.board.ships);
+             _ship_index++) {
+            var _ship = _player.board.ships[_ship_index];
+            var _survival = ai_cargo_survival_probability(_player, _ship);
+            for (var _cargo_index = 0;
+                 _cargo_index < array_length(_ship.cargo);
+                 _cargo_index++) {
+                _value += _ship.cargo[_cargo_index].definition.research_value
+                    * _survival;
+            }
+        }
+        return _value;
+    };
+
+    ai_sp_research_margin = function(_player) {
+        return ai_sp_research_position(_player)
+            - ai_sp_research_position(
+                game_state.players[1 - _player.index]
+            );
+    };
+
+    ai_sp_margin_multiplier = function(_margin) {
+        if (_margin <= 0) return 0;
+        if (_margin == 1) return 0.85;
+        if (_margin == 2) return 1;
+        if (_margin == 3) return 1.08;
+        return 1.12;
+    };
+
+    ai_sp_ready_attack_strength = function(_player) {
+        var _strength = 0;
+        for (var _index = 0;
+             _index < array_length(_player.board.characters);
+             _index++) {
+            var _card = _player.board.characters[_index];
+            if (_card.ready) {
+                _strength += get_card_stat(
+                    _card, "raid_attacker_character"
+                );
+            }
+        }
+        return _strength;
+    };
+
+    ai_sp_ready_defense_strength = function(_player, _ship) {
+        var _strength = 0;
+        for (var _index = 0;
+             _index < array_length(_player.board.characters);
+             _index++) {
+            var _card = _player.board.characters[_index];
+            if (_card.ready) {
+                _strength += raid_character_contribution(_card, _ship);
+            }
+        }
+        return _strength;
+    };
+
+    ai_sp_raid_frontier = function(
+        _player, _extra_character_strength, _virtual_ship_strength,
+        _defense_reduction
+    ) {
+        if (is_undefined(_extra_character_strength)) {
+            _extra_character_strength = 0;
+        }
+        if (is_undefined(_virtual_ship_strength)) {
+            _virtual_ship_strength = -1;
+        }
+        if (is_undefined(_defense_reduction)) _defense_reduction = 0;
+        var _enemy = game_state.players[1 - _player.index];
+        var _character_strength = ai_sp_ready_attack_strength(_player)
+            + _extra_character_strength;
+        var _scores = [];
+        var _ship_count = array_length(_player.board.ships)
+            + (_virtual_ship_strength >= 0 ? 1 : 0);
+        for (var _ship_index = 0; _ship_index < _ship_count; _ship_index++) {
+            var _virtual = _ship_index >= array_length(
+                _player.board.ships
+            );
+            var _attacker = _virtual
+                ? undefined : _player.board.ships[_ship_index];
+            if (!_virtual
+            && (!_attacker.ready || array_length(_attacker.cargo) > 0)) {
+                continue;
+            }
+            var _ship_power = _virtual
+                ? _virtual_ship_strength
+                : get_card_stat(_attacker, "raid_attacker_ship");
+            var _attack_power = _ship_power + _character_strength;
+            for (var _target_index = 0;
+                 _target_index < array_length(_enemy.board.ships);
+                 _target_index++) {
+                var _target = _enemy.board.ships[_target_index];
+                var _defense = max(
+                    0,
+                    get_card_stat(_target, "raid_defender_ship")
+                        + raid_tyr_support_potential(_enemy, _target)
+                        + ai_sp_ready_defense_strength(_enemy, _target)
+                        - _defense_reduction
+                );
+                var _margin = _attack_power - _defense;
+                if (_margin <= 0) continue;
+                var _target_value = 0.25
+                    + max(0, get_card_stat(_target)) * 0.09;
+                if (array_length(_enemy.board.ships) == 1) {
+                    _target_value += 0.35;
+                }
+                for (var _cargo_index = 0;
+                     _cargo_index < array_length(_target.cargo);
+                     _cargo_index++) {
+                    var _cargo = _target.cargo[_cargo_index];
+                    _target_value += _cargo.definition.research_value;
+                    if (_ship_power >= _cargo.definition.hazard) {
+                        var _survival = _virtual
+                            ? 0.72
+                            : ai_cargo_survival_probability(
+                                _player, _attacker
+                            );
+                        _target_value += _cargo.definition.research_value
+                            * _survival * 1.20;
+                    }
+                }
+                array_push(
+                    _scores,
+                    _target_value * ai_sp_margin_multiplier(_margin)
+                );
+            }
+        }
+        array_sort(_scores, function(_left, _right) {
+            return _right - _left;
+        });
+        var _frontier = 0;
+        if (array_length(_scores) > 0) _frontier += _scores[0];
+        if (array_length(_scores) > 1) _frontier += _scores[1] * 0.35;
+        if (array_length(_scores) > 2) _frontier += _scores[2] * 0.15;
+        return _frontier;
+    };
+
+    ai_sp_best_ready_target_delta = function(_player) {
+        var _before = ai_sp_raid_frontier(_player, 0, -1, 0);
+        var _best = 0;
+        for (var _index = 0;
+             _index < array_length(_player.board.characters);
+             _index++) {
+            var _card = _player.board.characters[_index];
+            if (_card.ready) continue;
+            _best = max(
+                _best,
+                ai_sp_raid_frontier(
+                    _player,
+                    get_card_stat(_card, "raid_attacker_character"),
+                    -1,
+                    0
+                ) - _before
+            );
+        }
+        for (var _ship_index = 0;
+             _ship_index < array_length(_player.board.ships);
+             _ship_index++) {
+            var _ship = _player.board.ships[_ship_index];
+            if (_ship.ready || array_length(_ship.cargo) > 0) continue;
+            _best = max(
+                _best,
+                ai_sp_raid_frontier(
+                    _player,
+                    0,
+                    get_card_stat(_ship, "raid_attacker_ship"),
+                    0
+                ) - _before
+            );
+        }
+        return max(0, _best);
+    };
+
+    ai_sp_card_priority = function(_card, _player, _profile) {
+        var _before = ai_sp_raid_frontier(_player, 0, -1, 0);
+        var _type = _card.definition.type;
+        var _extra_strength = 0;
+        var _virtual_ship = -1;
+        if (_type == "character") {
+            _extra_strength = get_card_stat(
+                _card, "raid_attacker_character"
+            );
+            if (card_has_faction(_card, "SP")
+            && ai_sp_has_ready_zebesian(_player)) {
+                // The candidate itself gives ready Zebesian Pirate +1 Strength.
+                _extra_strength += 1;
+            }
+        } else if (_type == "ship") {
+            _virtual_ship = get_card_stat(_card, "raid_attacker_ship");
+        }
+        var _after = ai_sp_raid_frontier(
+            _player, _extra_strength, _virtual_ship, 0
+        );
+        var _bonus = min(1.50, max(0, _after - _before));
+
+        if (_type == "character"
+        && array_length(_player.board.characters) < 4) _bonus += 0.06;
+        if (_type == "ship") {
+            var _ships = array_length(_player.board.ships);
+            _bonus += _ships <= 0 ? 0.20 : (_ships == 1 ? 0.12 : 0.05);
+        }
+        if (_profile.ready) {
+            _bonus += min(0.55, ai_sp_best_ready_target_delta(_player));
+        }
+        if (_profile.removal) {
+            _bonus += min(
+                0.45,
+                max(0, ai_sp_raid_frontier(_player, 0, -1, 1) - _before)
+            );
+        }
+        if (_profile.economy) _bonus += 0.08;
+        if (_type == "character" && card_has_faction(_card, "SP")
+        && ai_sp_has_homeworld(_player)) _bonus += 0.08;
+        return _bonus;
+    };
+
+    ai_sp_raid_commitment = function(_player, _attacker, _defense) {
+        var _available = [];
+        for (var _index = 0;
+             _index < array_length(_player.board.characters);
+             _index++) {
+            var _card = _player.board.characters[_index];
+            if (!_card.ready) continue;
+            array_push(_available, {
+                strength: get_card_stat(
+                    _card, "raid_attacker_character"
+                ),
+                pirate: card_has_faction(_card, "SP")
+            });
+        }
+        var _predicted = get_card_stat(
+            _attacker, "raid_attacker_ship"
+        );
+        var _result = {
+            strength: 0,
+            pirate_count: 0,
+            character_count: 0
+        };
+        while (_predicted <= _defense && array_length(_available) > 0) {
+            var _best = 0;
+            for (var _candidate = 1;
+                 _candidate < array_length(_available);
+                 _candidate++) {
+                if (_available[_candidate].strength
+                > _available[_best].strength) _best = _candidate;
+            }
+            var _committed = _available[_best];
+            array_delete(_available, _best, 1);
+            _predicted += _committed.strength;
+            _result.strength += _committed.strength;
+            _result.pirate_count += _committed.pirate ? 1 : 0;
+            _result.character_count += 1;
+        }
+        return _result;
+    };
+
+    ai_sp_action_priority = function(_candidate, _player) {
+        if (_candidate.kind != "raid") {
+            if (_candidate.kind == "capture") {
+                var _before_margin = ai_sp_research_margin(_player);
+                return _before_margin < 0 ? 0.16 : 0.08;
+            }
+            return 0;
+        }
+        if (_candidate.index < 0
+        || _candidate.index >= array_length(_player.board.ships)) return 0;
+        var _enemy = game_state.players[1 - _player.index];
+        if (_candidate.secondary < 0
+        || _candidate.secondary >= array_length(_enemy.board.ships)) return 0;
+        var _attacker = _player.board.ships[_candidate.index];
+        var _target = _enemy.board.ships[_candidate.secondary];
+        var _attack = get_card_stat(_attacker, "raid_attacker_ship")
+            + ai_sp_ready_attack_strength(_player);
+        var _defense = get_card_stat(_target, "raid_defender_ship")
+            + raid_tyr_support_potential(_enemy, _target)
+            + ai_sp_ready_defense_strength(_enemy, _target);
+        var _margin = _attack - _defense;
+        var _commitment = ai_sp_raid_commitment(
+            _player, _attacker, _defense
+        );
+        var _bonus = _margin <= 0 ? 0
+            : (_margin == 1 ? 0.05
+                : (_margin == 2 ? 0.20
+                    : (_margin == 3 ? 0.32 : 0.40)));
+        if (_margin > 0) {
+            _bonus += min(0.25, ai_sp_ready_pirate_count(_player) * 0.05);
+        }
+        var _has_cargo = array_length(_target.cargo) > 0;
+        if (_has_cargo) _bonus += 0.15;
+        if (array_length(_enemy.board.ships) == 1) _bonus += 0.10;
+        if (_attacker.definition_id == "loc.pirate_destroyer") {
+            _bonus += 0.10;
+        }
+
+        var _total_pirates = max(1, ai_sp_total_pirate_count(_player));
+        var _ready_after = ai_sp_ready_pirate_count(_player)
+            - (card_has_faction(_attacker, "SP") ? 1 : 0)
+            - _commitment.pirate_count;
+        var _readiness = max(0, _ready_after) / _total_pirates;
+        var _readiness_penalty = _readiness >= 0.60 ? 0
+            : (_readiness >= 0.40 ? 0.12
+                : (_readiness >= 0.20 ? 0.30 : 0.55));
+        var _denied_research = 0;
+        var _stolen_research = 0;
+        var _target_survival = ai_cargo_survival_probability(
+            _enemy, _target
+        );
+        for (var _cargo_index = 0;
+             _cargo_index < array_length(_target.cargo);
+             _cargo_index++) {
+            var _cargo = _target.cargo[_cargo_index];
+            _denied_research += _cargo.definition.research_value
+                * _target_survival;
+            if (array_length(_attacker.cargo) <= 0
+            && _cargo.definition.hazard <= get_card_stat(_attacker)) {
+                _stolen_research = max(
+                    _stolen_research,
+                    _cargo.definition.research_value
+                );
+            }
+        }
+        if (_stolen_research >= 2
+        || array_length(_enemy.board.ships) == 1) {
+            _readiness_penalty *= 0.5;
+        }
+        _bonus -= _readiness_penalty;
+
+        var _ready_ships_after = 0;
+        for (var _ship_index = 0;
+             _ship_index < array_length(_player.board.ships);
+             _ship_index++) {
+            if (_ship_index != _candidate.index
+            && _player.board.ships[_ship_index].ready
+            && array_length(_player.board.ships[_ship_index].cargo) <= 0) {
+                _ready_ships_after += 1;
+            }
+        }
+        var _recovering = _ready_ships_after <= 0
+            || _ready_after < 2;
+        if (_recovering) _bonus -= _has_cargo ? 0.10 : 0.30;
+
+        // Reconstruct the containment cost already charged by the generic raid
+        // score, then refund only the faction's conditional tolerance fraction.
+        var _before_loss = ai_lab_failure_cost(_player);
+        var _after_loss = ai_containment_loss_at(
+            _player,
+            max(0, ai_ready_strength(_player) - _commitment.strength),
+            ai_best_other_ship_security(_player, _attacker.instance_id)
+        );
+        var _breach_cost = max(0, _after_loss - _before_loss);
+        if (_breach_cost > 0 && _margin > 0) {
+            var _before_research_margin = ai_sp_research_margin(_player);
+            var _research_swing = _denied_research
+                + _stolen_research
+                    * ai_cargo_survival_probability(_player, _attacker);
+            var _after_research_margin = _before_research_margin
+                + _research_swing;
+            var _tolerance = 1;
+            if (_before_research_margin <= 0
+            && _after_research_margin > 0) {
+                _tolerance = _stolen_research > 0 ? 0.45 : 0.55;
+                _bonus += 0.40;
+            } else if (_stolen_research >= _breach_cost) {
+                _tolerance = 0.70;
+                _bonus += 0.20;
+            } else if (array_length(_enemy.board.ships) == 1
+            && _before_research_margin < 0) {
+                _tolerance = 0.70;
+            }
+            // Catastrophic projected losses place a floor under recklessness.
+            if (_breach_cost > 2.5) _tolerance = max(_tolerance, 0.75);
+            if (array_length(_player.board.characters) <= 1) {
+                _tolerance = max(_tolerance, 0.80);
+            }
+            _bonus += _breach_cost * (1 - _tolerance);
+        }
+        return _bonus;
+    };
+
+    ai_sp_posture = function(_player) {
+        var _ready_pirates = ai_sp_ready_pirate_count(_player);
+        var _total_pirates = ai_sp_total_pirate_count(_player);
+        var _ready_ship = false;
+        for (var _ship_index = 0;
+             _ship_index < array_length(_player.board.ships);
+             _ship_index++) {
+            var _ship = _player.board.ships[_ship_index];
+            if (_ship.ready && array_length(_ship.cargo) <= 0) {
+                _ready_ship = true;
+                break;
+            }
+        }
+        if (!_ready_ship || _ready_pirates < 2) return "RECOVER";
+        if (_total_pirates < 4) return "GROW";
+        var _enemy = game_state.players[1 - _player.index];
+        for (var _enemy_ship_index = 0;
+             _enemy_ship_index < array_length(_enemy.board.ships);
+             _enemy_ship_index++) {
+            if (array_length(_enemy.board.ships[_enemy_ship_index].cargo) > 0
+            && ai_sp_raid_frontier(_player, 0, -1, 0) > 0) return "HUNT";
+        }
+        if (ai_sp_raid_frontier(_player, 0, -1, 0) > 0) {
+            return "OVERWHELM";
+        }
+        return "GROW";
+    };
+
     ai_board_has_phazon_plan = function(_player) {
         var _zones = [
             _player.board.characters,
             _player.board.ships,
-            _player.board.locations
+            _player.board.locations,
+            _player.board.relics
         ];
         for (var _zone_index = 0;
              _zone_index < array_length(_zones);
@@ -321,7 +1365,8 @@ function loc_ai() {
         var _zones = [
             _enemy.board.characters,
             _enemy.board.ships,
-            _enemy.board.locations
+            _enemy.board.locations,
+            _enemy.board.relics
         ];
         for (var _zone_index = 0;
              _zone_index < array_length(_zones);
@@ -646,7 +1691,8 @@ function loc_ai() {
             var _cleanse_zones = [
                 _player.board.characters,
                 _player.board.ships,
-                _player.board.locations
+                _player.board.locations,
+                _player.board.relics
             ];
             for (var _cleanse_zone = 0;
                  _cleanse_zone < array_length(_cleanse_zones);
@@ -691,6 +1737,7 @@ function loc_ai() {
         if (_profile.ready) {
             _value += 0.12;
         }
+        _value += ai_personality_card_bonus(_card, _player, _profile);
         if (_cache_key != "") {
             variable_struct_set(ai_eval_utility_cache, _cache_key, _value);
         }
@@ -1072,9 +2119,13 @@ function loc_ai() {
             sequence: []
         }];
         var _best = _beam[0];
-        var _beam_width = 48;
-        var _max_paid_actions = 3;
-        var _max_steps = 5;
+        var _difficulty = ai_difficulty_key();
+        var _beam_width = _difficulty == "cadet" ? 8
+            : (_difficulty == "tactical" ? 24 : 48);
+        var _max_paid_actions = _difficulty == "cadet" ? 1
+            : (_difficulty == "tactical" ? 2 : 3);
+        var _max_steps = _difficulty == "cadet" ? 2
+            : (_difficulty == "tactical" ? 4 : 5);
         // Each wave adds one action. Free actions do not consume the three-paid
         // action horizon, but the five-step cap and resource groups prevent
         // repeatable zero-cost lines from growing without bound.
@@ -1284,7 +2335,8 @@ function loc_ai() {
         var _zones = [
             _player.board.characters,
             _player.board.ships,
-            _player.board.locations
+            _player.board.locations,
+            _player.board.relics
         ];
         for (var _zone_index = 0;
              _zone_index < array_length(_zones);
@@ -1477,9 +2529,11 @@ function loc_ai() {
             ["character", game_state.players[game_state.active_player].board.characters],
             ["ship", game_state.players[game_state.active_player].board.ships],
             ["location", game_state.players[game_state.active_player].board.locations],
+            ["relic", game_state.players[game_state.active_player].board.relics],
             ["opponent_character", game_state.players[1 - game_state.active_player].board.characters],
             ["opponent_ship", game_state.players[1 - game_state.active_player].board.ships],
             ["opponent_location", game_state.players[1 - game_state.active_player].board.locations],
+            ["opponent_relic", game_state.players[1 - game_state.active_player].board.relics],
             ["shop", game_state.shop_row]
         ];
         for (var _group_index = 0;
@@ -1630,7 +2684,8 @@ function loc_ai() {
         var _zones = [
             _player.board.characters,
             _player.board.ships,
-            _player.board.locations
+            _player.board.locations,
+            _player.board.relics
         ];
         for (var _faction_index = 0;
              _faction_index < array_length(_factions);
@@ -2653,21 +3708,16 @@ function loc_ai() {
                 || !_special_player.board.ships[_special_ship_index].ready) {
                     _special_ship_index = -1;
                 }
-                // The AI always declines Adam's optional destruction. Resolve the
-                // current special-containment entry directly so the mandatory
-                // prompt cannot survive a nominally successful AI step.
                 ai_debug_log(
-                    "Special containment: resolving directly with Ship index "
+                    "Special containment: selected Ship index "
                     + string(_special_ship_index) + "."
                 );
-                return resolve_special_containment_now(_special_ship_index);
+                return choose_special_containment_ship(_special_ship_index);
 
             case "adam_breach":
-                ai_debug_log(
-                    "Adam Malkovich: declined optional Ship contribution; "
-                    + "preserving the Ship for later actions."
+                return resolve_adam_breach_choice(
+                    ai_should_use_adam(_choice)
                 );
-                return resolve_adam_breach_choice(false);
 
             case "breach_character":
                 var _breach_player =
@@ -2797,6 +3847,36 @@ function loc_ai() {
 
     ai_select_action = function() {
         var _player = game_state.players[game_state.active_player];
+        if (ai_brain_key(_player) == "commander") {
+            var _gf_trace_state = ai_gf_stability(_player);
+            ai_debug_log(
+                "GF posture " + ai_gf_posture(_player)
+                + ": containment margin "
+                + string(_gf_trace_state.containment_margin)
+                + ", defense margin "
+                + string(_gf_trace_state.defense_margin)
+                + ", exposed loaded Ships "
+                + string(_gf_trace_state.loaded_exposure)
+                + ", roles E/C/F/D "
+                + string(_gf_trace_state.roles.economy) + "/"
+                + string(_gf_trace_state.roles.containment) + "/"
+                + string(_gf_trace_state.roles.fleet) + "/"
+                + string(_gf_trace_state.roles.defense) + "."
+            );
+        } else if (ai_brain_key(_player) == "pirate") {
+            ai_debug_log(
+                "SP posture " + ai_sp_posture(_player)
+                + ": raid frontier "
+                + string_format(
+                    ai_sp_raid_frontier(_player, 0, -1, 0), 0, 2
+                )
+                + " CV, Research margin "
+                + string_format(ai_sp_research_margin(_player), 0, 2)
+                + ", ready/total Pirates "
+                + string(ai_sp_ready_pirate_count(_player)) + "/"
+                + string(ai_sp_total_pirate_count(_player)) + "."
+            );
+        }
         if (ai_salvage_goal_instance_id >= 0) {
             for (var _goal_index = 0;
                  _goal_index < array_length(game_state.shop_row);
@@ -2875,7 +3955,8 @@ function loc_ai() {
         var _ability_zones = [
             ["character", _player.board.characters],
             ["ship", _player.board.ships],
-            ["location", _player.board.locations]
+            ["location", _player.board.locations],
+            ["relic", _player.board.relics]
         ];
         for (var _ability_zone_index = 0;
              _ability_zone_index < array_length(_ability_zones);
@@ -3365,7 +4446,8 @@ function loc_ai() {
         var _salvage_zones = [
             ["character", _player.board.characters],
             ["ship", _player.board.ships],
-            ["location", _player.board.locations]
+            ["location", _player.board.locations],
+            ["relic", _player.board.relics]
         ];
         for (var _salvage_zone_index = 0;
              _salvage_zone_index < array_length(_salvage_zones);
@@ -3499,6 +4581,7 @@ function loc_ai() {
         }
 
         ai_planner_collecting = false;
+        ai_apply_brain_and_difficulty(_turn_candidates, _player);
         var _turn_plan = ai_plan_turn(
             _turn_candidates, _player.command_points
         );

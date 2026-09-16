@@ -86,6 +86,42 @@ function loc_regression() {
             };
             show_debug_message("REGRESSION: starting suite");
             _reset();
+            var _relic_player = game_state.players[0];
+            var _relic_definition = variable_clone(get_card_definition("loc.gray_voice"));
+            _relic_definition.id = "test.relic";
+            _relic_definition.name = "Test Relic";
+            _relic_definition.type = "relic";
+            var _relic = make_card_instance(_relic_definition, 0, "hand");
+            _assert(put_card_in_play(_relic_player, _relic)
+                && array_length(_relic_player.board.relics) == 1
+                && array_length(_relic_player.board.locations) == 0
+                && array_length(_relic_player.board.characters) == 0,
+                "Relics enter their own permanent zone", "Expected only one Relic.");
+            _assert(get_ability_source("relic", 0) == _relic,
+                "Relics are ability sources", "Expected the deployed Relic.");
+            _assert(get_ready_character_strength(_relic_player) == 0,
+                "Relics supply no containment Strength", "Expected zero Strength.");
+            _relic.ready = false;
+            _assert(!can_salvage_permanent("relic", 0),
+                "Exhausted Relics cannot be salvaged", "Expected salvage rejection.");
+            resolve_ready_phase();
+            _assert(_relic.ready && can_salvage_permanent("relic", 0),
+                "Relics ready and become salvageable", "Expected a ready Relic.");
+            var _relic_source = make_card_instance(get_card_definition("loc.gray_voice"), 1, "board");
+            _assert(can_resolve_ability_target(
+                {target_kind: "another_permanent", source: _relic_source}, "relic", 0)
+                && !can_resolve_ability_target(
+                    {target_kind: "any_location", source: _relic_source}, "relic", 0),
+                "Relics are permanent targets but not Location targets",
+                "Expected permanent-only targeting.");
+            var _relic_refund = get_salvage_refund(_relic);
+            var _relic_cp = _relic_player.command_points;
+            _assert(salvage_permanent("relic", 0)
+                && array_length(_relic_player.board.relics) == 0
+                && array_length(_relic_player.discard) == 1
+                && _relic_player.command_points == _relic_cp + _relic_refund,
+                "Relic salvage discards and refunds CP", "Expected a cleared Relic zone and refund.");
+            _reset();
             var _gray = make_card_instance(
                 get_card_definition("loc.gray_voice"), 0, "board"
             );
@@ -800,16 +836,19 @@ function loc_regression() {
             choose_special_containment_ship(-1);
             var _adam_prompted = !is_undefined(pending_choice)
                 && pending_choice.kind == "adam_breach";
+            var _adam_ai_accepts = _adam_prompted
+                && ai_should_use_adam(pending_choice);
             resolve_adam_breach_choice(false);
             var _adam_breach_prompted = !is_undefined(pending_choice)
                 && pending_choice.kind == "breach_character";
             resolve_breach_character_choice(1);
             _assert(
                 _adam_prompted
+                && _adam_ai_accepts
                 && _adam_breach_prompted
                 && is_undefined(special_containment_sequence),
-                "Declining Adam advances special containment into the breach",
-                "Adam's optional prompt recreated or stalled the sequence."
+                "Adam evaluates a catastrophic breach and special containment advances",
+                "Adam misvalued the Omega cascade or its optional prompt stalled."
             );
 
             _reset();
@@ -2195,6 +2234,185 @@ function loc_regression() {
                     + array_length(_disabled_starter_player.hand) == 10,
                 "Faction starter toggle disables replacements",
                 "A disabled faction starter changed the neutral deck."
+            );
+
+            _reset();
+            var _gf_ai_player = game_state.players[0];
+            _gf_ai_player.is_ai = true;
+            _gf_ai_player.ai_brain = "commander";
+            var _gf_economy_candidate = make_card_instance(
+                get_card_definition("loc.gf_marine"), 0, "hand"
+            );
+            var _gf_economy_profile = ai_effect_profile(
+                _gf_economy_candidate
+            );
+            var _gf_stable_economy_value = ai_gf_card_priority(
+                _gf_economy_candidate,
+                _gf_ai_player,
+                _gf_economy_profile
+            );
+            array_push(
+                _gf_ai_player.lab,
+                make_metroid_instance(
+                    get_metroid_definition("metroid.omega"), "lab"
+                )
+            );
+            var _gf_unstable_economy_value = ai_gf_card_priority(
+                _gf_economy_candidate,
+                _gf_ai_player,
+                _gf_economy_profile
+            );
+            _assert(
+                _gf_stable_economy_value > _gf_unstable_economy_value,
+                "GF develops economy after stabilizing",
+                "An exposed GF board valued economy as highly as a stable board."
+            );
+
+            _reset();
+            _gf_ai_player = game_state.players[0];
+            _gf_ai_player.is_ai = true;
+            _gf_ai_player.ai_brain = "commander";
+            _gf_economy_candidate = make_card_instance(
+                get_card_definition("loc.gf_marine"), 0, "hand"
+            );
+            _gf_economy_profile = ai_effect_profile(_gf_economy_candidate);
+            var _gf_first_economy_value = ai_gf_card_priority(
+                _gf_economy_candidate,
+                _gf_ai_player,
+                _gf_economy_profile
+            );
+            var _gf_existing_marine = make_card_instance(
+                get_card_definition("loc.gf_marine"), 0, "board"
+            );
+            array_push(
+                _gf_ai_player.board.characters,
+                _gf_existing_marine
+            );
+            var _gf_redundant_economy_value = ai_gf_card_priority(
+                _gf_economy_candidate,
+                _gf_ai_player,
+                _gf_economy_profile
+            );
+            _assert(
+                _gf_first_economy_value > _gf_redundant_economy_value,
+                "GF values missing engine roles above redundancy",
+                "A redundant economy piece received the same role bonus as the first."
+            );
+
+            var _gf_salvage_priority = ai_gf_action_priority({
+                kind: "salvage",
+                index: 0,
+                secondary: -1,
+                source_kind: "character"
+            }, _gf_ai_player);
+            _assert(
+                ai_gf_card_is_critical(_gf_existing_marine, _gf_ai_player)
+                && _gf_salvage_priority <= -0.7,
+                "GF protects its sole engine pieces",
+                "Salvaging the only economy provider was not strongly discouraged."
+            );
+
+            _reset();
+            var _sp_ai_player = game_state.players[0];
+            var _sp_enemy = game_state.players[1];
+            _sp_ai_player.is_ai = true;
+            _sp_ai_player.ai_brain = "pirate";
+            var _sp_attack_ship = make_card_instance(
+                get_card_definition("loc.attack_vessel"), 0, "board"
+            );
+            var _sp_defense_ship = make_card_instance(
+                get_card_definition("loc.armoured_frigate"), 1, "board"
+            );
+            array_push(_sp_ai_player.board.ships, _sp_attack_ship);
+            array_push(_sp_enemy.board.ships, _sp_defense_ship);
+            var _sp_frontier_before = ai_sp_raid_frontier(
+                _sp_ai_player, 0, -1, 0
+            );
+            var _sp_non_faction_candidate = make_card_instance(
+                get_card_definition("loc.samus_aran"), 0, "hand"
+            );
+            var _sp_non_faction_value = ai_sp_card_priority(
+                _sp_non_faction_candidate,
+                _sp_ai_player,
+                ai_effect_profile(_sp_non_faction_candidate)
+            );
+            var _sp_frontier_after = ai_sp_raid_frontier(
+                _sp_ai_player,
+                get_card_stat(
+                    _sp_non_faction_candidate,
+                    "raid_attacker_character"
+                ),
+                -1,
+                0
+            );
+            _assert(
+                !card_has_faction(_sp_non_faction_candidate, "SP")
+                && _sp_frontier_after > _sp_frontier_before
+                && _sp_non_faction_value > 0,
+                "SP values non-faction cards that open Raid targets",
+                "A non-SP Strength contributor did not improve the Pirate frontier."
+            );
+
+            var _sp_margin_before_cargo = ai_sp_research_margin(
+                _sp_ai_player
+            );
+            array_push(
+                _sp_attack_ship.cargo,
+                make_metroid_instance(
+                    get_metroid_definition("metroid.larva"), "ship"
+                )
+            );
+            var _sp_margin_after_cargo = ai_sp_research_margin(
+                _sp_ai_player
+            );
+            _assert(
+                _sp_margin_after_cargo > _sp_margin_before_cargo,
+                "SP Research margin includes likely cargo intake",
+                "Adding cargo did not improve the projected Lab race."
+            );
+
+            _sp_attack_ship.cargo = [];
+            var _sp_weak_contributor = make_card_instance(
+                get_card_definition("starter.private_military"), 0, "board"
+            );
+            var _sp_strong_contributor = make_card_instance(
+                get_card_definition("loc.samus_aran"), 0, "board"
+            );
+            array_push(
+                _sp_ai_player.board.characters,
+                _sp_weak_contributor
+            );
+            array_push(
+                _sp_ai_player.board.characters,
+                _sp_strong_contributor
+            );
+            var _sp_commitment = ai_sp_raid_commitment(
+                _sp_ai_player,
+                _sp_attack_ship,
+                get_card_stat(_sp_attack_ship, "raid_attacker_ship")
+                    + get_card_stat(
+                        _sp_strong_contributor,
+                        "raid_attacker_character"
+                    ) - 1
+            );
+            _assert(
+                _sp_commitment.character_count == 1
+                && _sp_commitment.strength == get_card_stat(
+                    _sp_strong_contributor,
+                    "raid_attacker_character"
+                ),
+                "SP projects strongest-first Raid commitment",
+                "The projected Raid exhausted more or weaker Characters first."
+            );
+
+            _assert(
+                batch_profile_brain("GF") == "commander"
+                && batch_profile_brain("SP") == "pirate"
+                && batch_profile_brain("CZT") == "elder"
+                && batch_profile_brain("CZM") == "warrior"
+                && batch_profile_brain("") == "neutral",
+                "Batch profiles map to the named deck brains",
+                "A batch profile selected the wrong personalized evaluator."
             );
         } catch (_regression_error) {
             _assert_context.failed += 1;

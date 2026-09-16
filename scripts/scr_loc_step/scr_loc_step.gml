@@ -800,7 +800,8 @@ function loc_step() {
     && !is_undefined(ui_selected_kind)
     && (ui_selected_kind == "character"
         || ui_selected_kind == "ship"
-        || ui_selected_kind == "location")) {
+        || ui_selected_kind == "location"
+        || ui_selected_kind == "relic")) {
         var _guidance_ability_source = get_ability_source(
             ui_selected_kind,
             ui_selected_index
@@ -1262,6 +1263,11 @@ function loc_step() {
                     title_leader_p2_index = (title_leader_p2_index + 1)
                         mod array_length(title_leader_keys);
                     global.loc_leader_p2_index = title_leader_p2_index;
+                } else if (_hover_region.action == "title_cycle_ai_difficulty") {
+                    ai_difficulty_index = (ai_difficulty_index + 1)
+                        mod array_length(ai_difficulty_keys);
+                    global.loc_ai_difficulty_index = ai_difficulty_index;
+                    save_persistent_settings();
                 } else if (_hover_region.action == "title_play_context") {
                     if (net_player_name == "") net_player_name = "Player 1";
                     if (title_player_two_name == "") {
@@ -1347,6 +1353,8 @@ function loc_step() {
                     ) mod array_length(batch_matrix_filter_options);
                 } else if (_hover_region.action == "batch_toggle_drafting") {
                     batch_focused_drafting = !batch_focused_drafting;
+                } else if (_hover_region.action == "batch_toggle_deck_brains") {
+                    batch_deck_brains = !batch_deck_brains;
                 } else if (_hover_region.action == "batch_toggle_logs") {
                     batch_detailed_logs = !batch_detailed_logs;
                 } else if (_hover_region.action == "batch_toggle_report_value") {
@@ -2180,16 +2188,25 @@ function loc_step() {
         && (_hover_region.kind == "character"
             || _hover_region.kind == "ship"
             || _hover_region.kind == "location"
+            || _hover_region.kind == "relic"
             || _hover_region.kind == "opponent_character"
             || _hover_region.kind == "opponent_ship"
-            || _hover_region.kind == "opponent_location")) {
+            || _hover_region.kind == "opponent_location"
+            || _hover_region.kind == "opponent_relic")) {
+            var _clicked_raid_source_kind = get_raid_source_kind(
+                _hover_region.kind,
+                _hover_region.instance
+            );
             select_raid_ability_source(
-                get_raid_source_kind(
-                    _hover_region.kind,
-                    _hover_region.instance
-                ),
+                _clicked_raid_source_kind,
                 _hover_region.index
             );
+            if (_hover_region.instance.definition.type == "character") {
+                raid_contribute_selected(
+                    _clicked_raid_source_kind,
+                    _hover_region.index
+                );
+            }
         } else if (!is_undefined(pending_choice)
         && pending_choice.kind == "ability_target") {
             var _ability_target_kind = _hover_region.kind;
@@ -2197,9 +2214,11 @@ function loc_step() {
             && (_hover_region.kind == "character"
                 || _hover_region.kind == "ship"
                 || _hover_region.kind == "location"
+                || _hover_region.kind == "relic"
                 || _hover_region.kind == "opponent_character"
                 || _hover_region.kind == "opponent_ship"
-                || _hover_region.kind == "opponent_location")) {
+                || _hover_region.kind == "opponent_location"
+                || _hover_region.kind == "opponent_relic")) {
                 _ability_target_kind = get_raid_source_kind(
                     _hover_region.kind, _hover_region.instance
                 );
@@ -2320,6 +2339,14 @@ function loc_step() {
                         _selected_player.board.locations[ui_selected_index];
                 }
                 break;
+            case "relic":
+                if (ui_selected_index < array_length(
+                    _selected_player.board.relics
+                )) {
+                    _selected_current =
+                        _selected_player.board.relics[ui_selected_index];
+                }
+                break;
             case "lab":
                 if (ui_selected_index < array_length(_selected_player.lab)) {
                     _selected_current = _selected_player.lab[ui_selected_index];
@@ -2345,6 +2372,14 @@ function loc_step() {
                 )) {
                     _selected_current =
                         _selected_opponent.board.locations[ui_selected_index];
+                }
+                break;
+            case "opponent_relic":
+                if (ui_selected_index < array_length(
+                    _selected_opponent.board.relics
+                )) {
+                    _selected_current =
+                        _selected_opponent.board.relics[ui_selected_index];
                 }
                 break;
             case "opponent_lab":

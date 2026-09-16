@@ -71,7 +71,7 @@ function loc_bootstrap_state() {
             _width = 184;
             _height = 132;
             _rotate_ship = true;
-        } else if (_kind == "location") {
+        } else if ((_kind == "location" || _kind == "relic")) {
             _width = 104;
             _height = 146;
         } else if (_kind == "hand") {

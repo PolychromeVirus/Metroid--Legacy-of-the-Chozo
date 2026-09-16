@@ -1397,7 +1397,8 @@ function loc_raids() {
         var _zones = [
             _player.board.characters,
             _player.board.ships,
-            _player.board.locations
+            _player.board.locations,
+            _player.board.relics
         ];
         for (var _zone_index = 0; _zone_index < array_length(_zones); _zone_index++) {
             for (var _card_index = 0;
@@ -1608,7 +1609,8 @@ function loc_raids() {
         var _ending_zones = [
             _ending_player.board.characters,
             _ending_player.board.ships,
-            _ending_player.board.locations
+            _ending_player.board.locations,
+            _ending_player.board.relics
         ];
         for (var _zone_index = 0;
              _zone_index < array_length(_ending_zones);

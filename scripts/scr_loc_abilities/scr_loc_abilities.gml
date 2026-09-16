@@ -349,6 +349,11 @@ function loc_abilities() {
         && _source_index < array_length(_player.board.locations)) {
             return _player.board.locations[_source_index];
         }
+        if (_base_kind == "relic"
+        && _source_index >= 0
+        && _source_index < array_length(_player.board.relics)) {
+            return _player.board.relics[_source_index];
+        }
         return undefined;
     };
 
@@ -475,7 +480,8 @@ function loc_abilities() {
             var _phazon_zones = [
                 _controller.board.characters,
                 _controller.board.ships,
-                _controller.board.locations
+                _controller.board.locations,
+                _controller.board.relics
             ];
             var _has_phazon_source = false;
             for (var _phazon_zone_index = 0;
@@ -544,14 +550,17 @@ function loc_abilities() {
             array_delete(_player.board.ships, _source_index, 1);
         } else if (_base_kind == "location") {
             array_delete(_player.board.locations, _source_index, 1);
+        } else if (_base_kind == "relic") {
+            array_delete(_player.board.relics, _source_index, 1);
         } else if (_base_kind == "attachment") {
             var _attachment_zones = [
                 _player.board.characters,
                 _player.board.ships,
-                _player.board.locations
+                _player.board.locations,
+                _player.board.relics
             ];
             for (var _host_zone_index = 0;
-                 _host_zone_index < 3;
+                 _host_zone_index < array_length(_attachment_zones);
                  _host_zone_index++) {
                 for (var _host_index = 0;
                      _host_index < array_length(
@@ -636,10 +645,11 @@ function loc_abilities() {
             var _target_zones = [
                 _attachment_player.board.characters,
                 _attachment_player.board.ships,
-                _attachment_player.board.locations
+                _attachment_player.board.locations,
+                _attachment_player.board.relics
             ];
             for (var _target_zone_index = 0;
-                 _target_zone_index < 3;
+                 _target_zone_index < array_length(_target_zones);
                  _target_zone_index++) {
                 for (var _target_host_index = 0;
                      _target_host_index < array_length(
@@ -686,6 +696,8 @@ function loc_abilities() {
             array_delete(_player.board.ships, _source_index, 1);
         } else if (_base_kind == "location") {
             array_delete(_player.board.locations, _source_index, 1);
+        } else if (_base_kind == "relic") {
+            array_delete(_player.board.relics, _source_index, 1);
         } else {
             return false;
         }
@@ -1353,9 +1365,11 @@ function loc_abilities() {
         if (_choice.target_kind == "another_permanent") {
             return (_target_kind == "character"
                 || _target_kind == "ship"
+                || _target_kind == "relic"
                 || _target_kind == "location"
                 || _target_kind == "opponent_character"
                 || _target_kind == "opponent_ship"
+                || _target_kind == "opponent_relic"
                 || _target_kind == "opponent_location")
                 && !is_undefined(_target)
                 && _target.instance_id != _choice.source.instance_id;

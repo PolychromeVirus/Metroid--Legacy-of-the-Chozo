@@ -25,6 +25,10 @@ function loc_actions() {
                 array_push(_player.board.ships, _card);
                 return true;
 
+            case "relic":
+                array_push(_player.board.relics, _card);
+                return true;
+
             case "location":
                 array_push(_player.board.locations, _card);
                 return true;
@@ -332,7 +336,8 @@ function loc_actions() {
         var _zones = [
             _player.board.characters,
             _player.board.ships,
-            _player.board.locations
+            _player.board.locations,
+            _player.board.relics
         ];
         for (var _zone_index = 0;
              _zone_index < array_length(_zones);
@@ -428,7 +433,8 @@ function loc_actions() {
             _player.discard,
             _player.board.characters,
             _player.board.ships,
-            _player.board.locations
+            _player.board.locations,
+            _player.board.relics
         ];
         for (var _owned_zone_index = 0;
              _owned_zone_index < array_length(_owned_zones);
@@ -690,6 +696,7 @@ function loc_actions() {
             && game_state.priority_player != game_state.active_player)
         || (_base_kind != "character"
             && _base_kind != "ship"
+            && _base_kind != "relic"
             && _base_kind != "location")) {
             return false;
         }
@@ -718,7 +725,7 @@ function loc_actions() {
         if (guidance_is_local_player(_player.index)) {
             queue_first_game_guidance(
                 "salvage", "SALVAGE",
-                "Salvage discards one of your ready Characters, Vehicles, or Locations and grants half its printed Reserve cost, rounded down. The discarded card is no longer available on your board."
+                "Salvage discards one of your ready Characters, Vehicles, Locations, or Relics and grants half its printed Reserve cost, rounded down. The discarded card is no longer available on your board."
             );
         }
         if (!is_undefined(pending_choice)

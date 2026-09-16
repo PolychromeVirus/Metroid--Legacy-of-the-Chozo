@@ -1499,15 +1499,17 @@ function loc_draw() {
     var _opponent_sources = [
         _opponent.board.ships,
         _opponent.board.characters,
-        _opponent.board.locations
+        _opponent.board.locations,
+        _opponent.board.relics
     ];
     var _opponent_source_kinds = [
         "opponent_ship",
         "opponent_character",
-        "opponent_location"
+        "opponent_location",
+        "opponent_relic"
     ];
     for (var _opponent_source_index = 0;
-         _opponent_source_index < 3;
+         _opponent_source_index < array_length(_opponent_sources);
          _opponent_source_index++) {
         for (var _opponent_source_card_index = 0;
              _opponent_source_card_index
@@ -1555,7 +1557,7 @@ function loc_draw() {
     // space from the combat formation centered on SR388.
     var _opponent_main_play_left = _opponent_play_left;
     for (var _opponent_layout_zone = 0;
-         _opponent_layout_zone < 3;
+         _opponent_layout_zone < array_length(_opponent_sources);
          _opponent_layout_zone++) {
         var _opponent_layout_cards = _opponent_sources[_opponent_layout_zone];
         var _opponent_layout_count = array_length(_opponent_layout_cards);
@@ -1604,7 +1606,7 @@ function loc_draw() {
             var _opponent_arc = _opponent_layout_zone < 2
                 ? abs(_opponent_layout_index - _opponent_center_index) * 3
                 : 0;
-            var _opponent_location_position = _opponent_layout_zone == 2
+            var _opponent_location_position = _opponent_layout_zone >= 2
                 ? _get_location_cluster_position(
                     _opponent_layout_index,
                     _opponent_layout_count,
@@ -1613,16 +1615,16 @@ function loc_draw() {
                     _opponent_play_left,
                     _opponent_play_right,
                     (_opponent_play_top + _opponent_play_bottom) * 0.5,
-                    false,
+                    _opponent_layout_zone == 3,
                     true
                 )
                 : {x: _opponent_layout_start_x, y: _opponent_layout_start_y};
             array_push(_opponent_layout_rects, {
-                x: _opponent_layout_zone == 2
+                x: _opponent_layout_zone >= 2
                     ? _opponent_location_position.x
                     : _opponent_layout_start_x
                         + (_opponent_layout_index * _opponent_layout_step),
-                y: _opponent_layout_zone == 2
+                y: _opponent_layout_zone >= 2
                     ? _opponent_location_position.y
                     : _opponent_layout_start_y - _opponent_arc,
                 width: _opponent_layout_w,
@@ -1690,7 +1692,7 @@ function loc_draw() {
                     _opponent_card_y,
                     _opponent_slot_w,
                     _opponent_card_h,
-                    false,
+                    _opponent_layout_zone == 3,
                     true
                 );
             }
@@ -1905,7 +1907,7 @@ function loc_draw() {
                     _opponent_attachment_y,
                     20,
                     29,
-                    false,
+                    _opponent_layout_zone == 3,
                     true
                 );
                 _add_hit_region(
@@ -3166,10 +3168,11 @@ function loc_draw() {
     var _layout_sources = [
         _active_player.board.ships,
         _active_player.board.characters,
-        _active_player.board.locations
+        _active_player.board.locations,
+        _active_player.board.relics
     ];
-    var _layout_kinds = ["ship", "character", "location"];
-    for (var _layout_zone = 0; _layout_zone < 3; _layout_zone++) {
+    var _layout_kinds = ["ship", "character", "location", "relic"];
+    for (var _layout_zone = 0; _layout_zone < array_length(_layout_sources); _layout_zone++) {
         var _layout_cards = _layout_sources[_layout_zone];
         var _layout_count = array_length(_layout_cards);
         var _layout_card_w = _layout_zone == 0
@@ -3210,7 +3213,7 @@ function loc_draw() {
             var _layout_arc = _layout_zone < 2
                 ? abs(_layout_index - _layout_center_index) * 3
                 : 0;
-            var _location_position = _layout_zone == 2
+            var _location_position = _layout_zone >= 2
                 ? _get_location_cluster_position(
                     _layout_index,
                     _layout_count,
@@ -3219,7 +3222,7 @@ function loc_draw() {
                     _play_left,
                     _main_right - 12,
                     (_play_top + _play_bottom) * 0.5,
-                    true,
+                    _layout_zone == 2,
                     false
                 )
                 : {x: _layout_start_x, y: _layout_start_y};
@@ -3227,10 +3230,10 @@ function loc_draw() {
             array_push(_active_layout_kinds, _layout_kinds[_layout_zone]);
             array_push(_active_layout_indices, _layout_index);
             array_push(_active_layout_rects, {
-                x: _layout_zone == 2
+                x: _layout_zone >= 2
                     ? _location_position.x
                     : _layout_start_x + (_layout_index * _layout_step),
-                y: _layout_zone == 2
+                y: _layout_zone >= 2
                     ? _location_position.y
                     : _layout_start_y + _layout_arc,
                 width: _layout_card_w,
@@ -3444,7 +3447,7 @@ function loc_draw() {
                     _attachment_y,
                     23,
                     33,
-                    false,
+                    _opponent_layout_zone == 3,
                     true
                 );
                 _add_hit_region(
@@ -4472,10 +4475,12 @@ function loc_draw() {
         || ui_hover_kind == "ship"
         || ui_hover_kind == "character"
         || ui_hover_kind == "location"
+        || ui_hover_kind == "relic"
         || (_raid_hover_context
             && (ui_hover_kind == "opponent_ship"
                 || ui_hover_kind == "opponent_character"
-                || ui_hover_kind == "opponent_location"));
+                || ui_hover_kind == "opponent_location"
+                || ui_hover_kind == "opponent_relic"));
     if (_hover_can_supply_context) {
         ui_context_preview_kind = ui_hover_kind;
         ui_context_preview_index = ui_hover_index;
@@ -4551,6 +4556,14 @@ function loc_draw() {
                 ];
             }
             break;
+        case "relic":
+            if (ui_selected_index >= 0
+            && ui_selected_index < array_length(_active_player.board.relics)) {
+                _selected_instance = _active_player.board.relics[
+                    ui_selected_index
+                ];
+            }
+            break;
 
         case "opponent_character":
             if (ui_selected_index >= 0
@@ -4570,6 +4583,12 @@ function loc_draw() {
             if (ui_selected_index >= 0
             && ui_selected_index < array_length(_opponent.board.locations)) {
                 _selected_instance = _opponent.board.locations[ui_selected_index];
+            }
+            break;
+        case "opponent_relic":
+            if (ui_selected_index >= 0
+            && ui_selected_index < array_length(_opponent.board.relics)) {
+                _selected_instance = _opponent.board.relics[ui_selected_index];
             }
             break;
 
@@ -5280,7 +5299,8 @@ function loc_draw() {
                     get_activated_abilities(_selected_instance)
                 ) > 0 ? 3 : 2;
             } else if (ui_selected_kind == "character"
-            || ui_selected_kind == "location") {
+            || ui_selected_kind == "location"
+            || ui_selected_kind == "relic") {
                 _context_button_rows = max(
                     1,
                     min(3, array_length(
@@ -5754,32 +5774,6 @@ function loc_draw() {
                     );
                     _raid_button_row += 1;
                 }
-                var _raid_is_character = _raid_source.definition.type
-                    == "character";
-                var _raid_contributors = pending_choice.stage == "attackers"
-                    ? pending_choice.attacker_characters
-                    : pending_choice.defender_characters;
-                var _raid_is_contributing = _raid_is_character
-                    && raid_array_contains(
-                        _raid_contributors, _raid_source.instance_id
-                    );
-                if (_raid_is_character
-                && (_raid_source.ready || _raid_is_contributing)) {
-                    _draw_action_button(
-                        _raid_is_contributing
-                            ? "REMOVE CONTRIBUTION"
-                            : "EXHAUST: +" + string(get_card_stat(
-                                _raid_source, "raid_character"
-                            )) + " SECURITY",
-                        "raid_contribute",
-                        _button_x1,
-                        _button_y + _raid_button_row * (_button_h + 8),
-                        (_button_w * 2) + _button_gap,
-                        _button_h,
-                        true
-                    );
-                    _raid_button_row += 1;
-                }
                 if (can_salvage_permanent(
                     _raid_source_kind, ui_selected_index
                 )) {
@@ -5971,7 +5965,9 @@ function loc_draw() {
             );
         } else if (ui_selected_kind == "character"
         || ui_selected_kind == "location"
-        || ui_selected_kind == "opponent_location") {
+        || ui_selected_kind == "relic"
+        || ui_selected_kind == "opponent_location"
+        || ui_selected_kind == "opponent_relic") {
             var _selected_abilities = get_activated_abilities(_selected_instance);
             if (array_length(_selected_abilities) > 0) {
                 _draw_action_button(
@@ -6018,7 +6014,7 @@ function loc_draw() {
                     );
                 }
             }
-            if (ui_selected_kind != "opponent_location") {
+            if (ui_selected_kind != "opponent_location" && ui_selected_kind != "opponent_relic") {
                 _draw_action_button(
                     "SALVAGE +" + string(get_salvage_refund(_selected_instance)) + " CP",
                     "salvage",
@@ -6080,7 +6076,8 @@ function loc_draw() {
         && !_selected_is_metroid
         && (ui_selected_kind == "ship"
             || ui_selected_kind == "character"
-            || ui_selected_kind == "location")) {
+            || ui_selected_kind == "location"
+            || ui_selected_kind == "relic")) {
             _containment_abilities = get_activated_abilities(_selected_instance);
         }
         if (array_length(_containment_abilities) > 0) {
@@ -7682,6 +7679,12 @@ function loc_draw() {
                 _right_y + 88 + _submenu_step,
                 _title_right_w, _submenu_button_h, true
             );
+            _draw_action_button(
+                "AI DIFFICULTY: " + ai_difficulty_names[ai_difficulty_index],
+                "title_cycle_ai_difficulty", _title_right_x,
+                _right_y + 88 + (_submenu_step * 2),
+                _title_right_w, _submenu_button_h, true
+            );
         } else if (title_context_mode == "hotseat") {
             array_push(_title_name_fields, {
                 label: "PLAYER 1 NAME", kind: "title_name_p1",
@@ -7740,6 +7743,12 @@ function loc_draw() {
                     + title_leader_button_names[title_leader_p2_index],
                 "title_cycle_leader_p2", _title_right_x,
                 _right_y + _submenu_step,
+                _title_right_w, _submenu_button_h, true
+            );
+            _draw_action_button(
+                "AI DIFFICULTY: " + ai_difficulty_names[ai_difficulty_index],
+                "title_cycle_ai_difficulty", _title_right_x,
+                _right_y + (_submenu_step * 2),
                 _title_right_w, _submenu_button_h, true
             );
         } else if (title_context_mode == "settings") {
@@ -8035,11 +8044,20 @@ function loc_draw() {
                 case "title_cycle_leader_p2":
                     if (title_context_mode == "ai") {
                         _title_tip_title = "AI PLAYER DECK";
-                        _title_tip_body = "Choose the opposing AI player's starter deck.";
+                        var _ai_tip_leader = get_leader_identity_config(
+                            title_leader_keys[title_leader_p2_index]
+                        );
+                        _title_tip_body = title_leader_p2_index == 0
+                            ? "Choose a random opposing deck and its matching strategic brain."
+                            : _ai_tip_leader.ai_style;
                     } else {
                         _title_tip_title = "PLAYER 2 DECK";
                         _title_tip_body = "Choose the starter deck used by Player 2.";
                     }
+                    break;
+                case "title_cycle_ai_difficulty":
+                    _title_tip_title = "AI DIFFICULTY";
+                    _title_tip_body = "Cadet makes short, impulsive plans and sometimes accepts a merely good move. Tactical plans competently with small judgment errors. Commander uses the full strategic search. Every tier retains the selected leader's deck-specific priorities.";
                     break;
                 case "title_play_context":
                     _title_tip_title = "PLAY";
@@ -8327,7 +8345,18 @@ function loc_draw() {
                 "batch_cycle_matrix_filter",
                 _batch_left_x,
                 _batch_panel_y + 319,
-                _batch_panel_w - 60,
+                _batch_control_w,
+                42,
+                true
+            );
+            _draw_action_button(
+                batch_deck_brains
+                    ? "DECK BRAINS: ON"
+                    : "DECK BRAINS: OFF (NEUTRAL)",
+                "batch_toggle_deck_brains",
+                _batch_right_x,
+                _batch_panel_y + 319,
+                _batch_control_w,
                 42,
                 true
             );
@@ -8440,6 +8469,9 @@ function loc_draw() {
                         "DRAFTING: "
                             + (_report.focused_drafting
                                 ? "FOCUSED" : "ADAPTABLE"),
+                        "DECK BRAINS: "
+                            + (variable_struct_exists(_report, "deck_brains")
+                                && _report.deck_brains ? "ON" : "NEUTRAL"),
                         "BREACHING MUTATION: "
                             + (variable_struct_exists(
                                     _report, "breaching_mutation"

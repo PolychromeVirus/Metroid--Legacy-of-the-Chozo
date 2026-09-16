@@ -118,9 +118,10 @@ function loc_rules() {
         var _zones = [
             _player.board.characters,
             _player.board.ships,
-            _player.board.locations
+            _player.board.locations,
+            _player.board.relics
         ];
-        for (var _zone_index = 0; _zone_index < 3; _zone_index++) {
+        for (var _zone_index = 0; _zone_index < array_length(_zones); _zone_index++) {
             for (var _card_index = 0;
                  _card_index < array_length(_zones[_zone_index]);
                  _card_index++) {
@@ -1263,6 +1264,7 @@ function loc_rules() {
         ready_card_array(_player.board.characters, false);
         ready_card_array(_player.board.ships, true);
         ready_card_array(_player.board.locations, false);
+        ready_card_array(_player.board.relics, false);
         array_push(
             game_state.event_log,
             _player.name + " readied their available cards."
@@ -1512,6 +1514,8 @@ function loc_rules() {
                 + string(array_length(_summary_player.board.ships))
                 + ", Locations "
                 + string(array_length(_summary_player.board.locations))
+                + ", Relics "
+                + string(array_length(_summary_player.board.relics))
                 + "\n\n";
         }
         _summary += "TEMPO EVENTS\n";

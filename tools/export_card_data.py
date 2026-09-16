@@ -35,7 +35,7 @@ CARD_SHEETS = {
     },
 }
 METROID_SHEET = "Metroids"
-CARD_TYPES = {"Character", "Event", "Location", "Ship"}
+CARD_TYPES = {"Character", "Event", "Location", "Relic", "Ship"}
 FACTION_CODES = ("BH", "CZ", "GF", "NA", "SP", "PZ")
 KNOWN_MARKUP = {"cost", "ex", "des"}
 REQUIRED_CARD_COLUMNS = (

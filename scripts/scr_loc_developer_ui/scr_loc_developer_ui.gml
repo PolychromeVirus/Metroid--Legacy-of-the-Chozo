@@ -13,6 +13,9 @@ function loc_developer_ui() {
     settings_first_game_guidance = true;
     settings_experimental_breaching_mutation = false;
     settings_experimental_loaded_ships_exhausted = false;
+    ai_difficulty_keys = ["cadet", "tactical", "commander"];
+    ai_difficulty_names = ["CADET", "TACTICAL", "COMMANDER"];
+    ai_difficulty_index = 1;
     settings_menu_active = false;
     title_settings_scroll = 0;
     title_settings_scroll_max = 0;
@@ -33,6 +36,7 @@ function loc_developer_ui() {
             settings_experimental_breaching_mutation);
         ini_write_real("experimental", "loaded_ships_exhausted",
             settings_experimental_loaded_ships_exhausted);
+        ini_write_real("ai", "difficulty", ai_difficulty_index);
         ini_write_string("player", "name", net_player_name);
         ini_write_string("player", "name_two", title_player_two_name);
         ini_close();
@@ -63,6 +67,9 @@ function loc_developer_ui() {
         settings_experimental_loaded_ships_exhausted = ini_read_real(
             "experimental", "loaded_ships_exhausted", 0
         ) >= 1;
+        ai_difficulty_index = clamp(floor(ini_read_real(
+            "ai", "difficulty", 1
+        )), 0, array_length(ai_difficulty_keys) - 1);
         settings_saved_player_name = ini_read_string(
             "player", "name", "Player 1"
         );
@@ -77,6 +84,7 @@ function loc_developer_ui() {
         ready_card_array(_player.board.characters, false);
         ready_card_array(_player.board.ships, false);
         ready_card_array(_player.board.locations, false);
+        ready_card_array(_player.board.relics, false);
         array_push(game_state.event_log, "TEST: Active player's board readied.");
     };
 
@@ -458,6 +466,10 @@ function loc_developer_ui() {
         "QUIET ROBE",
         "RAVEN BEAK"
     ];
+    if (variable_global_exists("loc_ai_difficulty_index")) {
+        ai_difficulty_index = clamp(global.loc_ai_difficulty_index, 0,
+            array_length(ai_difficulty_keys) - 1);
+    }
     title_leader_p1_index = variable_global_exists("loc_leader_p1_index")
         ? clamp(global.loc_leader_p1_index, 0, array_length(title_leader_keys) - 1)
         : 0;
@@ -479,6 +491,7 @@ function loc_developer_ui() {
     batch_game_options = [1, 10, 50, 100, 500];
     batch_game_option_index = 1;
     batch_focused_drafting = false;
+    batch_deck_brains = true;
     batch_detailed_logs = true;
     batch_match_steps = 0;
     batch_match_invalid_reason = "";

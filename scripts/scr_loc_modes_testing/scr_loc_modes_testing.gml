@@ -4,27 +4,37 @@ function loc_modes_testing() {
             case "adam_malkovich": return {
                 name: "Adam Malkovich",
                 faction: "GF",
-                starter_id: "loc.gf_marine"
+                starter_id: "loc.gf_marine",
+                ai_brain: "commander",
+                ai_style: "Commander: develops an efficient board, preserves options, and favors economy, readying, and defensive support."
             };
             case "mother_brain": return {
                 name: "Mother Brain",
                 faction: "SP",
-                starter_id: "loc.zebesian_pirate"
+                starter_id: "loc.zebesian_pirate",
+                ai_brain: "pirate",
+                ai_style: "Pirate: grows its board, builds Raid superiority, and steals exposed cargo to sustain further interaction."
             };
             case "quiet_robe": return {
                 name: "Quiet Robe",
                 faction: "CZ",
-                starter_id: "loc.quiet_robe"
+                starter_id: "loc.quiet_robe",
+                ai_brain: "elder",
+                ai_style: "Elder: prioritizes Metroid control, safe capture, Security, and stable containment over marginal raids."
             };
             case "raven_beak": return {
                 name: "Raven Beak",
                 faction: "CZ",
-                starter_id: "loc.raven_beak"
+                starter_id: "loc.raven_beak",
+                ai_brain: "warrior",
+                ai_style: "Warrior: disrupts opposing development, builds Character strength, and seeks decisive pressure."
             };
             default: return {
                 name: "B.S.L. Researcher",
                 faction: "",
-                starter_id: "loc.armoured_frigate"
+                starter_id: "loc.armoured_frigate",
+                ai_brain: "neutral",
+                ai_style: "Neutral: pursues efficient captures, economy, Locations, and hand quality while avoiding low-value fights."
             };
         }
     };
@@ -44,6 +54,7 @@ function loc_modes_testing() {
         _player.leader_identity_id = _leader_id;
         _player.name = _leader.name;
         _player.favored_faction = _leader.faction;
+        _player.ai_brain = _leader.ai_brain;
         return apply_identity_starter(
             _player,
             false,
@@ -660,7 +671,8 @@ function loc_modes_testing() {
                 var _zones = [
                     _player.board.ships,
                     _player.board.characters,
-                    _player.board.locations
+                    _player.board.locations,
+                    _player.board.relics
                 ];
                 for (var _z = 0; _z < array_length(_zones) && !_started; _z++) {
                     if (array_length(_zones[_z]) > 0) {

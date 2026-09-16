@@ -65,7 +65,16 @@ This is a shared-market deck-builder in the style of Star Realms, not a construc
 | Ship | Captures and carries Metroids, contributes Security, and conducts raids |
 | Event | One-shot effect; must first be reserved into a player's deck |
 | Location | Persistent passive or activated ability |
+| Relic | A non-Character, non-Ship, non-Location permanent, such as an artifact or device; supplies passive or activated effects |
 | Metroid | Cannot be played normally; supplies Research Value and Hazard |
+
+Relics are a separate card type alongside Locations. They use normal permanent
+Deploy and Reserve costs, enter play ready, ready during their controller's ready
+phase, and can be salvaged. They occupy their own board cluster opposite Locations.
+They provide no inherent Strength, Security, containment, capture, or raid role.
+Effects that select a permanent can select a Relic; effects restricted to Characters,
+Ships, or Locations cannot. The workbook type is `Relic` (runtime `relic`). No existing
+cards have been reclassified; individual Relic definitions remain to be designed.
 
 Relevant card fields in the workbook are: count, set, faction, type, image, name, tags, effect, strength/security, deploy cost, reserve cost, flavor, dual-faction marker, and allowed layout.
 
@@ -104,7 +113,7 @@ Effect markup used by the card generator:
 - Hand (normally five cards)
 - Discard pile
 - Removed-from-game zone
-- Board/field for Characters, Ships, and Locations
+- Board/field with separate groups for Characters, Ships, Locations, and Relics
 - Lab for contained Metroids
 - Metroids currently aboard each Ship
 - Command Point pool
@@ -154,7 +163,7 @@ The active player may take actions in any order and may repeat them while able t
 | Play an Event | Once per turn; play it from hand for no CP cost |
 | Capture | Pay 1 CP and exhaust a Ship; move an eligible Metroid from SR388 onto it |
 | Raid | Pay the target's highest carried Hazard, or its current Security when empty, and resolve a Ship-versus-Ship raid |
-| Salvage | Discard any number of your ready Characters, Ships, or Locations one at a time; gain CP equal to half that card's printed Reserve cost, rounded down |
+| Salvage | Discard any number of your ready Characters, Ships, Locations, or Relics one at a time; gain CP equal to half that card's printed Reserve cost, rounded down |
 | Refresh hand | Pay 1 CP; discard any number of cards, then draw until holding five |
 | Refresh Shop | Pay 1 CP; discard all five Shop cards and refill the row |
 | Activate a card | Pay and resolve the costs printed on the card |
@@ -438,6 +447,99 @@ The initial rules review has no unresolved core cases. The full current card
 pool has a first-pass implementation. Test games may still expose wording,
 timing, or unusual state combinations that need clarification.
 
+### AI deck personality goals
+
+These are the abstract design goals for how each faction brain should feel to
+play against. They describe desired behavior rather than particular utility
+weights, card names, or implementation techniques.
+
+- Galactic Federation plays defensively, builds its economy, and focuses on
+  controlling and protecting its own board. It should prefer stable development,
+  preserve useful options, and become difficult to disrupt rather than seeking
+  interaction merely because interaction is available.
+- Space Pirates grow by taking from the opponent. They should build toward an
+  increasingly large and threatening board, use that growing advantage to
+  interact more often, and convert successful raids and theft into the ability
+  to win still more raids. Their play should feel cumulative and predatory.
+- Thoha maximize and manage their Lab. Containment is the center of their game:
+  they should continually secure enough containment to support a larger and more
+  valuable Lab, then exploit that safety to capture and retain more Metroids.
+  Their board development should serve the Lab rather than exist for its own
+  sake.
+- Mawkin dominate by disrupting the opponent's board. They should attack the
+  opponent's ability to establish and preserve a useful board state, repeatedly
+  removing, exhausting, or otherwise invalidating the opponent's development.
+  Their goal is not simply to raid often, but to keep the opponent from building
+  freely enough to execute a coherent plan.
+
+The neutral B.S.L. Researcher remains the general-purpose baseline brain. Its
+identity should come from efficient research and adaptable value play without
+being more specialized than the four faction strategies above.
+
+Runtime brain identifiers are `commander`, `pirate`, `elder`, `warrior`, and
+`neutral`. Batch Tests exposes a Deck Brains setting. When enabled, GF maps to
+commander, SP to pirate, CZT to elder, CZM to warrior, and NA to neutral. This
+mapping is independent from adaptable/focused drafting. When disabled, every
+seat uses the neutral brain as a control. The setting is stored in batch
+checkpoints, per-game records, CSV output, text summaries, and result metadata;
+older checkpoints without the field resume as neutral-brain controls.
+
+The implemented Galactic Federation commander evaluator measures projected
+containment margin, likely opposing Raid pressure, loaded-Ship exposure, and
+coverage of four engine roles: economy, containment, fleet, and defensive
+support. It changes posture between STABILIZE, SECURE, FORTIFY, DEVELOP,
+SUPPRESS, and EXPLOIT as those measurements change. Economy receives its largest
+bonus only while the board is stable. The first source of an engine role is
+valued most, one backup receives a smaller redundancy bonus, and further copies
+must justify themselves on ordinary utility. Captures, Raids, exhausting
+abilities, and Salvage are penalized when they expose containment or consume a
+unique role provider. A GF Raid is favored when it removes meaningful opposing
+pressure or contests cargo while leaving the engine intact. Debug AI traces
+record the current posture, margins, exposure, and role counts so the strategic
+reason for a change in behavior can be inspected during play.
+
+The implemented Space Pirate pirate evaluator measures a Raid frontier rather
+than awarding a general bonus to Strength or SP cards. For every ready attacking
+Ship it compares exact attacking Ship and ready-Character contributions against
+each defending Ship, its ready Characters, and Tyr support. Accessible targets
+are valued from Ship loss, cargo denial, likely cargo acquisition, and removal
+of the opponent's final capture platform. A one-point winning margin multiplies
+target value by 0.85, two by 1.00, three by 1.08, and four or more by the capped
+1.12. The best accessible target counts fully, the second at 35%, and the third
+at 15%. A card's Pirate Strength value is the change between the frontier before
+and after inserting that card's contribution, capped at +1.50 CV.
+
+Non-SP cards use the same marginal evaluation. A Ship receives +0.20, +0.12, or
++0.05 CV as the first, second, or later independent attacker. A readying effect
+receives the best frontier change available from a legal exhausted target,
+capped at +0.55. Removal simulates one point of opposing defense reduction and
+receives the resulting frontier change, capped at +0.45. Economy receives +0.08
+in addition to the shared evaluator's actual CP-option value. An SP card receives
+only a +0.03 identity tie-breaker by default. With a ready Zebesian Pirate, an SP
+candidate also simulates the Pirate's explicit +1 Strength; an SP Character with
+Space Pirate Homeworld receives +0.08 for that explicit readying relationship.
+
+The pirate Lab-race measurement is secured Lab Research plus each carried
+Metroid's Research multiplied by its carrier's estimated survival probability,
+compared against the opponent by the same calculation. Raid evaluation uses the
+same strongest-first Character commitment as production resolution, removes
+that Strength from projected containment, and begins by charging the full
+resulting breach cost. When denied/stolen Research covers that breach, SP treats
+70% of the cost as strategically relevant; when a theft changes SP from tied or
+behind to ahead, it treats 45% as relevant and adds +0.40 CV for crossing the
+lead threshold. Projected breach costs over 2.5 CV impose a minimum 75% cost,
+and having one or fewer Characters imposes a minimum 80% cost.
+
+The direct Raid personality modifier adds +0.05/+0.20/+0.32/+0.40 CV for
+winning margins of one/two/three/four-or-more, +0.05 per ready SP card capped at
++0.25, +0.15 for a loaded target, +0.10 for the opponent's final Ship, and +0.10
+for Pirate Destroyer. Leaving at least 60%/40%/20%/less-than-20% of SP permanents
+ready costs 0/-0.12/-0.30/-0.55; stealing at least two Research or destroying
+the final opposing Ship halves that penalty. Leaving no follow-up attacker or
+fewer than two ready Pirates costs another -0.30, reduced to -0.10 for a loaded
+target. AI traces report GROW, HUNT, OVERWHELM, or RECOVER posture together with
+Raid frontier, projected Research margin, and ready/total Pirate counts.
+
 Hyper Mode removes one Phazon token from every card the player controls,
 including attached cards, then places the complete removed total onto one chosen
 Character that player controls. If no tokens are removed, no choice is created;
@@ -453,9 +555,19 @@ structural gaps.
 Additional non-testing work still planned:
 
 - continued starter-deck and LOP balance testing;
-- AI multi-turn threat planning, especially the risk between capturing cargo and
-  banking it, protecting loaded Ships, holding CP for off-turn effects, and
-  recognizing favorable Raid windows;
+- continued refinement of the personalized leader AI brains. B.S.L. Researcher
+  emphasizes efficient capture, economy, Locations, and hand quality; Adam uses
+  the commander brain, favoring option preservation, readying, economy, and
+  defensive support; Mother Brain uses the pirate grow/overwhelm/steal brain;
+  Quiet Robe uses the elder brain centered on Metroid control, Security, safe
+  capture, and containment; Raven Beak uses the warrior brain centered on
+  Character strength, removal, and favorable Raid windows;
+- difficulty tuning for Cadet, Tactical, and Commander. Cadet uses a narrow,
+  short planning horizon with substantial evaluation uncertainty; Tactical uses
+  a medium horizon with small judgment errors; Commander retains the full
+  five-step beam search without evaluation noise. All difficulties keep their
+  leader's strategic priorities. Regression and batch modes always use the
+  Commander difficulty so historical diagnostics remain comparable;
 - focused timing audits for off-turn triggers, priority changes, nested choices,
   target/source removal, and Phazon exhaustion;
 - wording and terminology polish for the implemented Help page, contextual help,

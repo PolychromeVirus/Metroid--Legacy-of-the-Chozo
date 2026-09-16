@@ -72,6 +72,30 @@ class CardExportTests(unittest.TestCase):
                 ids = [record["id"] for record in records]
                 self.assertEqual(len(ids), len(set(ids)))
 
+    def test_relic_type_exports_without_combat_stat(self) -> None:
+        from openpyxl import load_workbook
+
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = Path(directory) / "relic.xlsx"
+            workbook = load_workbook(WORKBOOK)
+            sheet = workbook["Cards"]
+            headers = {cell.value: cell.column for cell in sheet[1]}
+            sheet.cell(2, headers["type"], "Relic")
+            sheet.cell(2, headers["strength"]).value = None
+            name = sheet.cell(2, headers["name"]).value
+            workbook.save(fixture)
+            workbook.close()
+            output = Path(directory) / "export"
+            result = subprocess.run(
+                [sys.executable, str(EXPORTER), "--workbook", str(fixture),
+                 "--output", str(output)], capture_output=True, text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            cards = json.loads((output / "cards_loc.json").read_text())["cards"]
+            relic = next(card for card in cards if card["name"] == name)
+            self.assertEqual(relic["type"], "relic")
+            self.assertIsNone(relic["stat"]["kind"])
+
     def test_starter_count_header_is_recovered(self) -> None:
         data = self.load("cards_starter.json")
         counts = {card["name"]: card["count"] for card in data["cards"]}

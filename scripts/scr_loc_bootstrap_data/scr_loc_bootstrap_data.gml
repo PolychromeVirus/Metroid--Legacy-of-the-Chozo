@@ -380,7 +380,8 @@ function loc_bootstrap_data() {
             board: {
                 characters: [],
                 ships: [],
-                locations: []
+                locations: [],
+                relics: []
             },
             lab: []
         };
