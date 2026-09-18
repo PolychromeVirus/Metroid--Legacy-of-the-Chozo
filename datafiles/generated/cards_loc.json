@@ -7,7 +7,7 @@
   "copy_count": 131,
   "cards": [
     {
-      "id": "loc.gandrayda",
+      "definition_id": "loc.gandrayda",
       "set": "LOC",
       "pool": "loc",
       "count": 2,
@@ -39,7 +39,7 @@
       }
     },
     {
-      "id": "loc.rundas",
+      "definition_id": "loc.rundas",
       "set": "LOC",
       "pool": "loc",
       "count": 2,
@@ -71,7 +71,7 @@
       }
     },
     {
-      "id": "loc.ghor",
+      "definition_id": "loc.ghor",
       "set": "LOC",
       "pool": "loc",
       "count": 2,
@@ -103,7 +103,7 @@
       }
     },
     {
-      "id": "loc.samus_aran",
+      "definition_id": "loc.samus_aran",
       "set": "LOC",
       "pool": "loc",
       "count": 2,
@@ -137,7 +137,7 @@
       }
     },
     {
-      "id": "loc.quiet_robe",
+      "definition_id": "loc.quiet_robe",
       "set": "LOC",
       "pool": "loc",
       "count": 4,
@@ -170,7 +170,7 @@
       }
     },
     {
-      "id": "loc.gray_voice",
+      "definition_id": "loc.gray_voice",
       "set": "LOC",
       "pool": "loc",
       "count": 2,
@@ -203,7 +203,7 @@
       }
     },
     {
-      "id": "loc.chozo_warrior",
+      "definition_id": "loc.chozo_warrior",
       "set": "LOC",
       "pool": "loc",
       "count": 4,
@@ -236,7 +236,7 @@
       }
     },
     {
-      "id": "loc.raven_beak",
+      "definition_id": "loc.raven_beak",
       "set": "LOC",
       "pool": "loc",
       "count": 2,
@@ -269,7 +269,7 @@
       }
     },
     {
-      "id": "loc.body_adaptation_machine",
+      "definition_id": "loc.body_adaptation_machine",
       "set": "LOC",
       "pool": "loc",
       "count": 2,
@@ -301,7 +301,7 @@
       }
     },
     {
-      "id": "loc.gf_soldier",
+      "definition_id": "loc.gf_soldier",
       "set": "LOC",
       "pool": "loc",
       "count": 2,
@@ -333,7 +333,7 @@
       }
     },
     {
-      "id": "loc.gf_marine",
+      "definition_id": "loc.gf_marine",
       "set": "LOC",
       "pool": "loc",
       "count": 4,
@@ -365,7 +365,7 @@
       }
     },
     {
-      "id": "loc.admiral_dane",
+      "definition_id": "loc.admiral_dane",
       "set": "LOC",
       "pool": "loc",
       "count": 2,
@@ -397,7 +397,7 @@
       }
     },
     {
-      "id": "loc.adam_malkovich",
+      "definition_id": "loc.adam_malkovich",
       "set": "LOC",
       "pool": "loc",
       "count": 2,
@@ -429,7 +429,7 @@
       }
     },
     {
-      "id": "loc.researcher",
+      "definition_id": "loc.researcher",
       "set": "LOC",
       "pool": "loc",
       "count": 2,
@@ -461,7 +461,7 @@
       }
     },
     {
-      "id": "loc.security_guard",
+      "definition_id": "loc.security_guard",
       "set": "LOC",
       "pool": "loc",
       "count": 4,
@@ -493,7 +493,7 @@
       }
     },
     {
-      "id": "loc.zebesian_pirate",
+      "definition_id": "loc.zebesian_pirate",
       "set": "LOC",
       "pool": "loc",
       "count": 4,
@@ -525,7 +525,7 @@
       }
     },
     {
-      "id": "loc.beam_pirate",
+      "definition_id": "loc.beam_pirate",
       "set": "LOC",
       "pool": "loc",
       "count": 2,
@@ -557,7 +557,7 @@
       }
     },
     {
-      "id": "loc.mother_brain",
+      "definition_id": "loc.mother_brain",
       "set": "LOC",
       "pool": "loc",
       "count": 2,
@@ -589,7 +589,7 @@
       }
     },
     {
-      "id": "loc.torizo",
+      "definition_id": "loc.torizo",
       "set": "LOC",
       "pool": "loc",
       "count": 4,
@@ -621,7 +621,7 @@
       }
     },
     {
-      "id": "loc.sa_x_breaks_out",
+      "definition_id": "loc.sa_x_breaks_out",
       "set": "LOC",
       "pool": "loc",
       "count": 3,
@@ -653,7 +653,7 @@
       }
     },
     {
-      "id": "loc.collision_course",
+      "definition_id": "loc.collision_course",
       "set": "LOC",
       "pool": "loc",
       "count": 3,
@@ -685,7 +685,7 @@
       }
     },
     {
-      "id": "loc.queen_metroid_awakens",
+      "definition_id": "loc.queen_metroid_awakens",
       "set": "LOC",
       "pool": "loc",
       "count": 3,
@@ -718,7 +718,7 @@
       }
     },
     {
-      "id": "loc.ready_room",
+      "definition_id": "loc.ready_room",
       "set": "LOC",
       "pool": "loc",
       "count": 2,
@@ -750,7 +750,7 @@
       }
     },
     {
-      "id": "loc.zebes",
+      "definition_id": "loc.zebes",
       "set": "LOC",
       "pool": "loc",
       "count": 2,
@@ -782,7 +782,7 @@
       }
     },
     {
-      "id": "loc.galactic_federation_hq",
+      "definition_id": "loc.galactic_federation_hq",
       "set": "LOC",
       "pool": "loc",
       "count": 2,
@@ -814,7 +814,7 @@
       }
     },
     {
-      "id": "loc.biologic_space_laboratories",
+      "definition_id": "loc.biologic_space_laboratories",
       "set": "LOC",
       "pool": "loc",
       "count": 2,
@@ -846,7 +846,7 @@
       }
     },
     {
-      "id": "loc.space_pirate_homeworld",
+      "definition_id": "loc.space_pirate_homeworld",
       "set": "LOC",
       "pool": "loc",
       "count": 2,
@@ -878,7 +878,7 @@
       }
     },
     {
-      "id": "loc.delano_7",
+      "definition_id": "loc.delano_7",
       "set": "LOC",
       "pool": "loc",
       "count": 2,
@@ -910,7 +910,7 @@
       }
     },
     {
-      "id": "loc.gunship",
+      "definition_id": "loc.gunship",
       "set": "LOC",
       "pool": "loc",
       "count": 4,
@@ -944,7 +944,7 @@
       }
     },
     {
-      "id": "loc.chozo_transport",
+      "definition_id": "loc.chozo_transport",
       "set": "LOC",
       "pool": "loc",
       "count": 3,
@@ -977,7 +977,7 @@
       }
     },
     {
-      "id": "loc.mawkin_starship",
+      "definition_id": "loc.mawkin_starship",
       "set": "LOC",
       "pool": "loc",
       "count": 3,
@@ -1010,7 +1010,7 @@
       }
     },
     {
-      "id": "loc.g_f_s_tyr",
+      "definition_id": "loc.g_f_s_tyr",
       "set": "LOC",
       "pool": "loc",
       "count": 4,
@@ -1042,7 +1042,7 @@
       }
     },
     {
-      "id": "loc.g_f_s_olympus",
+      "definition_id": "loc.g_f_s_olympus",
       "set": "LOC",
       "pool": "loc",
       "count": 2,
@@ -1074,7 +1074,7 @@
       }
     },
     {
-      "id": "loc.light_shuttle",
+      "definition_id": "loc.light_shuttle",
       "set": "LOC",
       "pool": "loc",
       "count": 4,
@@ -1106,7 +1106,7 @@
       }
     },
     {
-      "id": "loc.b_s_l_ship",
+      "definition_id": "loc.b_s_l_ship",
       "set": "LOC",
       "pool": "loc",
       "count": 2,
@@ -1138,7 +1138,7 @@
       }
     },
     {
-      "id": "loc.armoured_frigate",
+      "definition_id": "loc.armoured_frigate",
       "set": "LOC",
       "pool": "loc",
       "count": 2,
@@ -1170,7 +1170,7 @@
       }
     },
     {
-      "id": "loc.attack_vessel",
+      "definition_id": "loc.attack_vessel",
       "set": "LOC",
       "pool": "loc",
       "count": 4,
@@ -1202,7 +1202,7 @@
       }
     },
     {
-      "id": "loc.pirate_destroyer",
+      "definition_id": "loc.pirate_destroyer",
       "set": "LOC",
       "pool": "loc",
       "count": 2,
@@ -1234,7 +1234,7 @@
       }
     },
     {
-      "id": "loc.frigate_orpheon",
+      "definition_id": "loc.frigate_orpheon",
       "set": "LOC",
       "pool": "loc",
       "count": 2,
@@ -1266,7 +1266,7 @@
       }
     },
     {
-      "id": "loc.the_baby",
+      "definition_id": "loc.the_baby",
       "set": "LOC",
       "pool": "loc",
       "count": 2,
@@ -1300,7 +1300,7 @@
       }
     },
     {
-      "id": "loc.ship_captain",
+      "definition_id": "loc.ship_captain",
       "set": "LOC",
       "pool": "loc",
       "count": 2,
@@ -1332,7 +1332,7 @@
       }
     },
     {
-      "id": "loc.sloop",
+      "definition_id": "loc.sloop",
       "set": "LOC",
       "pool": "loc",
       "count": 3,
@@ -1364,7 +1364,7 @@
       }
     },
     {
-      "id": "loc.orders_received",
+      "definition_id": "loc.orders_received",
       "set": "LOC",
       "pool": "loc",
       "count": 4,
@@ -1396,7 +1396,7 @@
       }
     },
     {
-      "id": "loc.private_military",
+      "definition_id": "loc.private_military",
       "set": "LOC",
       "pool": "loc",
       "count": 4,
@@ -1428,7 +1428,7 @@
       }
     },
     {
-      "id": "loc.budget_cuts",
+      "definition_id": "loc.budget_cuts",
       "set": "LOC",
       "pool": "loc",
       "count": 2,
@@ -1460,7 +1460,7 @@
       }
     },
     {
-      "id": "loc.away_team",
+      "definition_id": "loc.away_team",
       "set": "LOC",
       "pool": "loc",
       "count": 2,
@@ -1492,7 +1492,7 @@
       }
     },
     {
-      "id": "loc.military_rations",
+      "definition_id": "loc.military_rations",
       "set": "LOC",
       "pool": "loc",
       "count": 2,
@@ -1524,7 +1524,7 @@
       }
     },
     {
-      "id": "loc.teleport_station",
+      "definition_id": "loc.teleport_station",
       "set": "LOC",
       "pool": "loc",
       "count": 2,
@@ -1557,7 +1557,7 @@
       }
     },
     {
-      "id": "loc.old_bird",
+      "definition_id": "loc.old_bird",
       "set": "LOC",
       "pool": "loc",
       "count": 2,
@@ -1590,7 +1590,7 @@
       }
     },
     {
-      "id": "loc.back_in_the_day",
+      "definition_id": "loc.back_in_the_day",
       "set": "LOC",
       "pool": "loc",
       "count": 3,

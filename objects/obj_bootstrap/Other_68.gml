@@ -81,7 +81,7 @@ switch (_event_type) {
                 var _new_participant_id = net_next_participant_id;
                 net_next_participant_id += 1;
                 array_push(net_lobby_participants, {
-                    id: _new_participant_id,
+                    participant_id: _new_participant_id,
                     name: _guest_name,
                     seat: _open_seat,
                     leader_id: variable_struct_exists(_packet, "leader_id")
@@ -122,7 +122,7 @@ switch (_event_type) {
                     );
                     if (_action_user >= 0) {
                         network_lobby_apply_action(
-                            net_lobby_participants[_action_user].id,
+                            net_lobby_participants[_action_user].participant_id,
                             _packet.action,
                             variable_struct_exists(_packet, "value")
                                 ? _packet.value : 0
@@ -187,7 +187,7 @@ switch (_event_type) {
                         if (_chat_sender_index >= 0) {
                             var _chat_sender_id = net_lobby_participants[
                                 _chat_sender_index
-                            ].id;
+                            ].participant_id;
                             append_network_chat_message(
                                 _chat_sender_id, _packet.message
                             );
@@ -241,7 +241,8 @@ switch (_event_type) {
                 _departed_name = net_lobby_participants[_departed].name;
                 network_broadcast({
                     type: "participant_disconnected",
-                    participant_id: net_lobby_participants[_departed].id,
+                    participant_id:
+                        net_lobby_participants[_departed].participant_id,
                     name: _departed_name,
                     seat: _departed_seat
                 }, _event_socket);

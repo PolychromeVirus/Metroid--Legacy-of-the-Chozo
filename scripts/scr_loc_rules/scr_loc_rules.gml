@@ -338,7 +338,7 @@ function loc_rules() {
         );
         _player.telemetry.breaches += 1;
 
-        if (_metroid.definition.id == "metroid.hunter") {
+        if (_metroid.definition.definition_id == "metroid.hunter") {
             for (var _i = 0;
                  _i < array_length(_player.board.characters);
                  _i++) {
@@ -382,7 +382,7 @@ function loc_rules() {
         for (var _hunter_index = 0;
              _hunter_index < array_length(_player.lab);
              _hunter_index++) {
-            if (_player.lab[_hunter_index].definition.id == "metroid.hunter") {
+            if (_player.lab[_hunter_index].definition.definition_id == "metroid.hunter") {
                 return _hunter_index;
             }
         }
@@ -415,7 +415,7 @@ function loc_rules() {
         var _breach_count = 0;
 
         for (var _i = 0; _i < array_length(_player.lab); _i++) {
-            if (_player.lab[_i].definition.id == "metroid.omega") {
+            if (_player.lab[_i].definition.definition_id == "metroid.omega") {
                 _has_omega = true;
                 break;
             }
@@ -496,7 +496,7 @@ function loc_rules() {
             for (var _omega_index = array_length(_player.lab) - 1;
                  _omega_index >= 0;
                  _omega_index--) {
-                if (_player.lab[_omega_index].definition.id == "metroid.omega") {
+                if (_player.lab[_omega_index].definition.definition_id == "metroid.omega") {
                     if (resolve_metroid_breach(
                         _player, _omega_index, false, true
                     )) {

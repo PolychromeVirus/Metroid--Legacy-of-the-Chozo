@@ -241,7 +241,7 @@ function loc_ai() {
                  _omega_index < array_length(_metroids);
                  _omega_index++) {
                 var _omega = _metroids[_omega_index];
-                if (_omega.definition.id == "metroid.omega") {
+                if (_omega.definition.definition_id == "metroid.omega") {
                     _remaining[_omega_index] = false;
                     _remaining_count -= 1;
                     _hazard -= _omega.definition.hazard;
@@ -261,7 +261,7 @@ function loc_ai() {
                  _lab_index++) {
                 if (!_remaining[_lab_index]) continue;
                 var _candidate = _metroids[_lab_index];
-                if (_candidate.definition.id == "metroid.hunter") {
+                if (_candidate.definition.definition_id == "metroid.hunter") {
                     _breach_index = _lab_index;
                     break;
                 }
@@ -373,7 +373,7 @@ function loc_ai() {
                 for (var _omega_index = array_length(_metroids) - 1;
                      _omega_index >= 0;
                      _omega_index--) {
-                    if (_metroids[_omega_index].definition.id
+                    if (_metroids[_omega_index].definition.definition_id
                     == "metroid.omega") {
                         _breach_index = _omega_index;
                         break;
@@ -388,7 +388,7 @@ function loc_ai() {
                      _metroid_index < array_length(_metroids);
                      _metroid_index++) {
                     var _candidate_metroid = _metroids[_metroid_index];
-                    if (_candidate_metroid.definition.id == "metroid.hunter") {
+                    if (_candidate_metroid.definition.definition_id == "metroid.hunter") {
                         _breach_index = _metroid_index;
                         break;
                     }
@@ -403,7 +403,7 @@ function loc_ai() {
             var _breach = _metroids[_breach_index];
             _loss += _breach.definition.research_value;
             _loss += ai_adam_mutation_breach_cost();
-            if (_breach.definition.id == "metroid.hunter") {
+            if (_breach.definition.definition_id == "metroid.hunter") {
                 for (var _hunter_character_index = 0;
                      _hunter_character_index < array_length(_characters);
                      _hunter_character_index++) {

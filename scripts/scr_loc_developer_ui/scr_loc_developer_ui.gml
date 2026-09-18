@@ -355,7 +355,7 @@ function loc_developer_ui() {
         }
         variable_struct_set(guidance_queued, _id, true);
         array_push(guidance_queue, {
-            id: _id,
+            lesson_id: _id,
             title: _title,
             body: _body,
             persistent: true,
@@ -367,7 +367,7 @@ function loc_developer_ui() {
     queue_blocking_notice = function(_title, _body) {
         if (game_state.game_mode == "regression") return false;
         array_push(guidance_queue, {
-            id: "",
+            lesson_id: "",
             title: _title,
             body: _body,
             persistent: false,
@@ -381,7 +381,7 @@ function loc_developer_ui() {
         && (!variable_struct_exists(guidance_active, "persistent")
             || guidance_active.persistent)) {
             ini_open("loc_settings.ini");
-            ini_write_real("guidance_seen", guidance_active.id, 1);
+            ini_write_real("guidance_seen", guidance_active.lesson_id, 1);
             ini_close();
         }
         guidance_active = undefined;
@@ -505,6 +505,7 @@ function loc_developer_ui() {
     spectator_hand_peek_amount = 0;
     net_command_sequence = 0;
     net_last_applied_sequence = 0;
+    net_debug_state_signature = "";
     ai_next_step_time = 0;
     ai_action_delay = 420;
     ai_last_action = "";
@@ -599,7 +600,7 @@ function loc_developer_ui() {
             var _resume_participant = net_lobby_participants[
                 _resume_participant_index
             ];
-            if (_resume_participant.id == net_local_participant_id) {
+            if (_resume_participant.participant_id == net_local_participant_id) {
                 network_local_player = _resume_participant.seat;
                 break;
             }

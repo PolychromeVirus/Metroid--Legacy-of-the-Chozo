@@ -62,3 +62,11 @@ Temporary Items
 
 # GMRT build directory
 Build
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Local run/scratch output
+/loc_batch_checkpoint.json
+/tmp/
+/outputs/

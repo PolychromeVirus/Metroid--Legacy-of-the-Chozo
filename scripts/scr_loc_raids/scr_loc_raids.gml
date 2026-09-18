@@ -388,7 +388,7 @@ function loc_raids() {
         pending_choice.ability_index = array_length(_legal_indices) == 1
             ? _legal_indices[0]
             : -1;
-        ui_selected_kind = _source_kind;
+        ui_selected_kind = get_view_kind(_source_kind);
         ui_selected_index = _source_index;
         ui_selected_instance_id = _source.instance_id;
         return true;
@@ -1605,27 +1605,34 @@ function loc_raids() {
             resolve_game_over();
             return true;
         }
-        var _ending_player = game_state.players[game_state.active_player];
-        var _ending_zones = [
-            _ending_player.board.characters,
-            _ending_player.board.ships,
-            _ending_player.board.locations,
-            _ending_player.board.relics
-        ];
-        for (var _zone_index = 0;
-             _zone_index < array_length(_ending_zones);
-             _zone_index++) {
-            for (var _card_index = 0;
-                 _card_index < array_length(_ending_zones[_zone_index]);
-                 _card_index++) {
-                var _ending_card = _ending_zones[_zone_index][_card_index];
-                _ending_card.temporary_stat_bonus = 0;
-                _ending_card.ai_readied_by_effect_this_turn = false;
-                if (_ending_card.copy_until_end_turn) {
-                    _ending_card.definition_id =
-                        _ending_card.printed_definition_id;
-                    _ending_card.definition = _ending_card.printed_definition;
-                    _ending_card.copy_until_end_turn = false;
+        // "This turn" effects end now for both players, including effects
+        // used off-turn such as Raid defense.
+        for (var _ending_player_index = 0;
+             _ending_player_index < array_length(game_state.players);
+             _ending_player_index++) {
+            var _ending_player = game_state.players[_ending_player_index];
+            var _ending_zones = [
+                _ending_player.board.characters,
+                _ending_player.board.ships,
+                _ending_player.board.locations,
+                _ending_player.board.relics
+            ];
+            for (var _zone_index = 0;
+                 _zone_index < array_length(_ending_zones);
+                 _zone_index++) {
+                for (var _card_index = 0;
+                     _card_index < array_length(_ending_zones[_zone_index]);
+                     _card_index++) {
+                    var _ending_card = _ending_zones[_zone_index][_card_index];
+                    _ending_card.temporary_stat_bonus = 0;
+                    _ending_card.ai_readied_by_effect_this_turn = false;
+                    if (_ending_card.copy_until_end_turn) {
+                        _ending_card.definition_id =
+                            _ending_card.printed_definition_id;
+                        _ending_card.definition =
+                            _ending_card.printed_definition;
+                        _ending_card.copy_until_end_turn = false;
+                    }
                 }
             }
         }

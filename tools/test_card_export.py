@@ -69,7 +69,7 @@ class CardExportTests(unittest.TestCase):
         ):
             with self.subTest(filename=filename):
                 records = self.load(filename)[key]
-                ids = [record["id"] for record in records]
+                ids = [record["definition_id"] for record in records]
                 self.assertEqual(len(ids), len(set(ids)))
 
     def test_relic_type_exports_without_combat_stat(self) -> None:

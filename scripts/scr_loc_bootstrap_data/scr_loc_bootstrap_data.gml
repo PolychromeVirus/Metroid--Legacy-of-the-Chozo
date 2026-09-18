@@ -95,7 +95,7 @@ function loc_bootstrap_data() {
         for (var _i = 0; _i < array_length(_data.cards); _i++) {
             var _card = _data.cards[_i];
             if (!is_struct(_card)
-            || !variable_struct_exists(_card, "id")
+            || !variable_struct_exists(_card, "definition_id")
             || !variable_struct_exists(_card, "image")) {
                 array_push(
                     load_errors,
@@ -104,12 +104,19 @@ function loc_bootstrap_data() {
                 continue;
             }
 
-            if (variable_struct_exists(card_database.cards_by_id, _card.id)) {
-                array_push(load_errors, "Duplicate card id: " + _card.id);
+            if (variable_struct_exists(
+                card_database.cards_by_id,
+                _card.definition_id
+            )) {
+                array_push(load_errors, "Duplicate card id: " + _card.definition_id);
                 continue;
             }
 
-            variable_struct_set(card_database.cards_by_id, _card.id, _card);
+            variable_struct_set(
+                card_database.cards_by_id,
+                _card.definition_id,
+                _card
+            );
             var _pool_cards = variable_struct_get(
                 card_database.pools,
                 _expected_pool
@@ -141,7 +148,7 @@ function loc_bootstrap_data() {
         for (var _i = 0; _i < array_length(_data.metroids); _i++) {
             var _metroid = _data.metroids[_i];
             if (!is_struct(_metroid)
-            || !variable_struct_exists(_metroid, "id")
+            || !variable_struct_exists(_metroid, "definition_id")
             || !variable_struct_exists(_metroid, "stage_key")) {
                 array_push(
                     load_errors,
@@ -150,14 +157,17 @@ function loc_bootstrap_data() {
                 continue;
             }
 
-            if (variable_struct_exists(card_database.metroids_by_id, _metroid.id)) {
-                array_push(load_errors, "Duplicate Metroid id: " + _metroid.id);
+            if (variable_struct_exists(
+                card_database.metroids_by_id,
+                _metroid.definition_id
+            )) {
+                array_push(load_errors, "Duplicate Metroid id: " + _metroid.definition_id);
                 continue;
             }
 
             variable_struct_set(
                 card_database.metroids_by_id,
-                _metroid.id,
+                _metroid.definition_id,
                 _metroid
             );
             array_push(card_database.pools.metroids, _metroid);
@@ -190,7 +200,7 @@ function loc_bootstrap_data() {
     };
 
     get_definition_sprite = function(_definition, _is_metroid) {
-        var _cache_key = _definition.id;
+        var _cache_key = _definition.definition_id;
         if (variable_struct_exists(sprite_cache, _cache_key)) {
             return variable_struct_get(sprite_cache, _cache_key);
         }
@@ -200,7 +210,7 @@ function loc_bootstrap_data() {
         if (_path == "") {
             array_push(
                 load_errors,
-                "Missing image for " + _definition.id + ": " + _relative_path
+                "Missing image for " + _definition.definition_id + ": " + _relative_path
             );
             variable_struct_set(sprite_cache, _cache_key, -1);
             return -1;
@@ -254,9 +264,9 @@ function loc_bootstrap_data() {
     make_card_instance = function(_definition, _owner, _zone) {
         var _instance = {
             instance_id: next_card_instance_id,
-            definition_id: _definition.id,
+            definition_id: _definition.definition_id,
             definition: _definition,
-            printed_definition_id: _definition.id,
+            printed_definition_id: _definition.definition_id,
             printed_definition: _definition,
             copy_until_end_turn: false,
             granted_factions: [],
@@ -284,6 +294,8 @@ function loc_bootstrap_data() {
             ui_shop_slot: -1,
             ui_angle_initialized: false,
             ui_angle: 0,
+            ui_tilt: 0,
+            ui_commit_lift: 0,
             ui_last_phazon_tokens: 0,
             ui_phazon_flash_started_ms: -1
         };
@@ -328,7 +340,7 @@ function loc_bootstrap_data() {
     make_metroid_instance = function(_definition, _zone) {
         var _instance = {
             instance_id: next_metroid_instance_id,
-            definition_id: _definition.id,
+            definition_id: _definition.definition_id,
             definition: _definition,
             zone: _zone,
             ui_position_initialized: false,

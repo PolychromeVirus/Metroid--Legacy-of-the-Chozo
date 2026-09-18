@@ -549,6 +549,109 @@ function loc_draw() {
         );
     };
 
+    // Red marker above cards the local player must choose to discard or destroy.
+    var _card_is_removal_choice = function(_kind, _index, _card) {
+        if (is_undefined(pending_choice) || is_undefined(_card)) return false;
+        var _chooser = game_state.priority_player;
+        switch (pending_choice.kind) {
+            case "breach_character":
+                _chooser = pending_choice.player_index;
+                break;
+            case "researcher_discard":
+                _chooser = game_state.active_player;
+                break;
+            case "ability_target":
+                if (pending_choice.ability.effect_kind != "discard_card"
+                && pending_choice.ability.effect_kind
+                    != "dark_samus_discard") return false;
+                break;
+            default:
+                return false;
+        }
+        var _local_chooser = game_state.game_mode == "hotseat"
+            || (game_state.game_mode == "ai"
+                && !game_state.players[_chooser].is_ai)
+            || (game_state.game_mode == "network"
+                && network_local_player == _chooser);
+        if (!_local_chooser) return false;
+        switch (pending_choice.kind) {
+            case "breach_character":
+                return (_kind == "character" || _kind == "opponent_character")
+                    && _card.controller == _chooser;
+            case "researcher_discard":
+                return _kind == "hand";
+        }
+        if (_kind == "hand") return false;
+        return can_resolve_ability_target(
+            pending_choice, get_rules_kind(_kind), _index
+        );
+    };
+
+    // Committed Raid Characters, multi-selected discard targets and hovered
+    // breach discards rise from the fan (returns 1 or 0; callers scale by height).
+    var _get_commitment_lift = function(_kind, _index, _card) {
+        if (is_undefined(pending_choice)
+        || _card.definition.type != "character") return 0;
+        if (pending_choice.kind == "raid") {
+            var _committed = (variable_struct_exists(
+                    pending_choice, "attacker_characters"
+                ) && raid_array_contains(
+                    pending_choice.attacker_characters, _card.instance_id
+                ))
+                || (variable_struct_exists(
+                    pending_choice, "defender_characters"
+                ) && raid_array_contains(
+                    pending_choice.defender_characters, _card.instance_id
+                ));
+            return _committed ? 1 : 0;
+        }
+        if (pending_choice.kind == "ability_target"
+        && variable_struct_exists(pending_choice, "multi_select")
+        && pending_choice.multi_select) {
+            return raid_array_contains(
+                pending_choice.selected_targets, _card.instance_id
+            ) ? 1 : 0;
+        }
+        return pending_choice.kind == "breach_character"
+            && _card.controller == pending_choice.player_index
+            && ui_hover_kind == _kind
+            && ui_hover_index == _index ? 1 : 0;
+    };
+
+    var _is_multi_select_choice = function() {
+        return !is_undefined(pending_choice)
+            && pending_choice.kind == "ability_target"
+            && variable_struct_exists(pending_choice, "multi_select")
+            && pending_choice.multi_select;
+    };
+
+    // Commitment choices show selection by lifting or tilting, not outlines.
+    var _is_commitment_choice = function() {
+        if (is_undefined(pending_choice)) {
+            return game_state.phase == "containment";
+        }
+        return (pending_choice.kind == "ability_target"
+            && variable_struct_exists(pending_choice, "multi_select")
+            && pending_choice.multi_select)
+            || pending_choice.kind == "breach_character"
+            || pending_choice.kind == "special_containment_ship"
+            || (pending_choice.kind == "raid"
+                && (pending_choice.stage == "attackers"
+                    || pending_choice.stage == "defenders"));
+    };
+
+    // Ships selected to contribute to containment tilt.
+    var _get_commitment_tilt = function(_kind, _index, _card) {
+        if (_card.definition.type != "ship"
+        || ui_selected_kind != _kind
+        || ui_selected_index != _index) return 0;
+        var _selecting = is_undefined(pending_choice)
+            ? game_state.phase == "containment"
+            : pending_choice.kind == "special_containment_ship";
+        if (!_selecting) return 0;
+        return string_pos("opponent_", _kind) == 1 ? -45 : 45;
+    };
+
     var _draw_raidability_line = function(_x, _y, _width) {
         draw_set_alpha(0.28);
         draw_set_color(make_color_rgb(255, 35, 35));
@@ -570,7 +673,9 @@ function loc_draw() {
         for (var _ability_index = 0;
              _ability_index < array_length(_abilities);
              _ability_index++) {
-            if (can_activate_selected_ability(_kind, _index, _ability_index)) {
+            if (can_activate_selected_ability(
+                get_rules_kind(_kind), _index, _ability_index
+            )) {
                 return true;
             }
         }
@@ -834,14 +939,14 @@ function loc_draw() {
             && ((_action == "title_select_" + title_context_mode)
                 || (_action == "help_topic_"
                     + string(help_selected_index)));
+        var _button_inverted = _enabled
+            && (_navigation_selected || _hovered);
         var _button_background = !_enabled
             ? make_color_rgb(36, 47, 57)
-            : (_navigation_selected
-                ? ui_color_title
-                : (_hovered ? ui_color_selected : ui_color_panel_alt));
+            : (_button_inverted ? ui_color_title : ui_color_panel_alt);
         var _button_foreground = !_enabled
             ? ui_color_muted
-            : (_navigation_selected ? ui_color_panel_alt : ui_color_title);
+            : (_button_inverted ? ui_color_panel_alt : ui_color_title);
         draw_set_color(
             _button_background
         );
@@ -957,7 +1062,8 @@ function loc_draw() {
         _max_width,
         _max_height,
         _rotate_ship,
-        _always_show_stat
+        _always_show_stat,
+        _tilt
     ) {
         if (is_undefined(_instance)) {
             draw_set_color(ui_color_line);
@@ -992,6 +1098,11 @@ function loc_draw() {
             if (abs(_instance.ui_angle - _target_angle) < 0.25) {
                 _instance.ui_angle = _target_angle;
             }
+            var _target_tilt = is_undefined(_tilt) ? 0 : _tilt;
+            _instance.ui_tilt = lerp(_instance.ui_tilt, _target_tilt, 0.18);
+            if (abs(_instance.ui_tilt - _target_tilt) < 0.25) {
+                _instance.ui_tilt = _target_tilt;
+            }
         }
         var _draw_angle = _is_ship ? _instance.ui_angle : 0;
         var _source_width = _is_ship
@@ -1017,22 +1128,24 @@ function loc_draw() {
         var _draw_x = _x + floor((_max_width - _width) * 0.5);
         var _draw_y = _y + floor((_max_height - _height) * 0.5);
 
-        draw_set_color(ui_color_panel_alt);
-        draw_rectangle(
-            _draw_x,
-            _draw_y,
-            _draw_x + _width,
-            _draw_y + _height,
-            false
-        );
+        if (!_is_ship || _instance.ui_tilt == 0) {
+            draw_set_color(ui_color_panel_alt);
+            draw_rectangle(
+                _draw_x,
+                _draw_y,
+                _draw_x + _width,
+                _draw_y + _height,
+                false
+            );
+        }
 
         if (_sprite >= 0 && _is_ship) {
             var _card_center_x = _x + (_max_width * 0.5);
             var _card_center_y = _y + (_max_height * 0.5);
             var _half_source_w = _source_width * _scale * 0.5;
             var _half_source_h = _source_height * _scale * 0.5;
-            var _corner_cos = dcos(_draw_angle);
-            var _corner_sin = dsin(_draw_angle);
+            var _corner_cos = dcos(_draw_angle + _instance.ui_tilt);
+            var _corner_sin = dsin(_draw_angle + _instance.ui_tilt);
             var _corner_x1 = _card_center_x
                 + (-_half_source_w * _corner_cos)
                 - (-_half_source_h * _corner_sin);
@@ -1686,6 +1799,16 @@ function loc_draw() {
                     _opponent_card_h
                 );
             } else {
+                _opponent_card.ui_commit_lift = lerp(
+                    _opponent_card.ui_commit_lift,
+                    _get_commitment_lift(
+                        _opponent_kind,
+                        _opponent_logical_index,
+                        _opponent_card
+                    ) * _opponent_card_h * 0.4,
+                    0.2
+                );
+                _opponent_card_y += _opponent_card.ui_commit_lift;
                 _draw_card(
                     _opponent_card,
                     _opponent_card_x,
@@ -1693,7 +1816,12 @@ function loc_draw() {
                     _opponent_slot_w,
                     _opponent_card_h,
                     _opponent_layout_zone == 3,
-                    true
+                    true,
+                    _get_commitment_tilt(
+                        _opponent_kind,
+                        _opponent_logical_index,
+                        _opponent_card
+                    )
                 );
             }
             var _opponent_bounds = _get_card_bounds(
@@ -1718,19 +1846,34 @@ function loc_draw() {
                     1
                 );
             }
+            if (_card_is_removal_choice(
+                _opponent_kind,
+                _opponent_logical_index,
+                _opponent_card
+            )) {
+                _draw_raidability_line(
+                    _opponent_bounds.x,
+                    _opponent_bounds.y - 5,
+                    _opponent_bounds.width
+                );
+            }
+            // Lifted cards keep their resting footprint so hover cannot flicker.
+            var _opponent_hit_lift = _opponent_zone_index == 3
+                ? 0 : _opponent_card.ui_commit_lift;
             _add_hit_region(
                 _opponent_kind,
                 _opponent_logical_index,
                 _opponent_card,
                 _opponent_bounds.x,
-                _opponent_bounds.y,
+                _opponent_bounds.y - _opponent_hit_lift,
                 _opponent_bounds.width,
-                _opponent_bounds.height
+                _opponent_bounds.height + _opponent_hit_lift
             );
-            if ((ui_selected_kind == _opponent_kind
+            if (!_is_commitment_choice()
+            && ((ui_selected_kind == _opponent_kind
             && ui_selected_index == _opponent_logical_index)
             || (ui_hover_kind == _opponent_kind
-            && ui_hover_index == _opponent_logical_index)) {
+            && ui_hover_index == _opponent_logical_index))) {
                 _draw_selection(
                     _opponent_bounds.x,
                     _opponent_bounds.y,
@@ -1742,21 +1885,19 @@ function loc_draw() {
             }
             if (!is_undefined(pending_choice)
             && (pending_choice.kind == "ability_target"
+                && !_is_multi_select_choice()
                 && can_resolve_ability_target(
                     pending_choice,
                     get_raid_source_kind(_opponent_kind, _opponent_card),
                     _opponent_logical_index
                 )
                 || pending_choice.kind == "space_pirate_ready"
-                && pending_choice.owner_index != game_state.active_player
+                && pending_choice.owner_index != game_state.view_player
                 && _opponent_kind == "opponent_character"
                 && !_opponent_card.ready
                 && card_has_faction(_opponent_card, "SP")
-                || pending_choice.kind == "breach_character"
-                && pending_choice.player_index != game_state.active_player
-                && _opponent_kind == "opponent_character"
                 || pending_choice.kind == "olympus_ready"
-                && pending_choice.player_index != game_state.active_player
+                && pending_choice.player_index != game_state.view_player
                 && _opponent_kind == "opponent_character"
                 && !_opponent_card.ready
                 && card_has_faction(_opponent_card, "GF"))) {
@@ -1771,49 +1912,17 @@ function loc_draw() {
             }
             if (!is_undefined(pending_choice)
             && pending_choice.kind == "raid") {
-                var _opponent_raid_target = pending_choice.stage == "target"
-                    && _opponent_kind == "opponent_ship";
-                var _opponent_raid_character = false;
-                var _opponent_raid_ability =
-                    _opponent_card.controller == game_state.priority_player
-                    && _opponent_kind != "opponent_lab"
-                    && (pending_choice.stage == "attackers"
-                        || pending_choice.stage == "defenders");
-                if (_opponent_raid_target
-                || _opponent_raid_character
-                || _opponent_raid_ability) {
-                    var _opponent_raid_affordable = true;
-                    var _opponent_raid_cost = 0;
-                    if (_opponent_raid_target) {
-                        _opponent_raid_cost = get_raid_cost(
-                            game_state.players[game_state.active_player],
-                            _opponent_card
-                        );
-                        _opponent_raid_affordable = game_state.players[
-                            game_state.active_player
-                        ].command_points >= _opponent_raid_cost;
-                    }
-                    var _opponent_raid_selected = _opponent_raid_character
-                        && raid_array_contains(
-                            pending_choice.stage == "attackers"
-                                ? pending_choice.attacker_characters
-                                : pending_choice.defender_characters,
-                            _opponent_card.instance_id
-                        );
-                    _opponent_raid_selected = _opponent_raid_selected
-                        || (_opponent_raid_ability
-                        && pending_choice.ability_source_kind
-                            == get_raid_source_kind(
-                                _opponent_kind,
-                                _opponent_card
-                            )
-                        && pending_choice.ability_source_index
-                            == _opponent_logical_index);
+                if (pending_choice.stage == "target"
+                && _opponent_kind == "opponent_ship") {
+                    var _opponent_raid_affordable = game_state.players[
+                        game_state.active_player
+                    ].command_points >= get_raid_cost(
+                        game_state.players[game_state.active_player],
+                        _opponent_card
+                    );
                     draw_set_color(
-                        _opponent_raid_selected
-                            ? ui_color_selected
-                            : (_opponent_raid_affordable
-                                ? ui_color_success : ui_color_muted)
+                        _opponent_raid_affordable
+                            ? ui_color_success : ui_color_muted
                     );
                     draw_rectangle(
                         _opponent_bounds.x - 3,
@@ -1923,7 +2032,7 @@ function loc_draw() {
                 && pending_choice.kind == "ability_target"
                 && can_resolve_ability_target(
                     pending_choice,
-                    "opponent_attachment",
+                    get_rules_kind("opponent_attachment"),
                     _opponent_attachment.instance_id
                 )) {
                     draw_set_color(ui_color_success);
@@ -3259,8 +3368,17 @@ function loc_draw() {
                 "active_board",
                 0
             );
+            _active_card.ui_commit_lift = lerp(
+                _active_card.ui_commit_lift,
+                _get_commitment_lift(
+                    _zone_kind,
+                    _logical_zone_index,
+                    _active_card
+                ) * _active_rect.height * 0.4,
+                0.2
+            );
             _active_rect.x = _active_position.x;
-            _active_rect.y = _active_position.y;
+            _active_rect.y = _active_position.y - _active_card.ui_commit_lift;
              _draw_card(
                 _active_card,
                 _active_rect.x,
@@ -3268,7 +3386,12 @@ function loc_draw() {
                 _active_rect.width,
                 _active_rect.height,
                 false,
-                true
+                true,
+                _get_commitment_tilt(
+                    _zone_kind,
+                    _logical_zone_index,
+                    _active_card
+                )
             );
             var _active_bounds = _get_card_bounds(
                 _active_card,
@@ -3291,6 +3414,17 @@ function loc_draw() {
                     1
                 );
             }
+            if (_card_is_removal_choice(
+                _zone_kind,
+                _logical_zone_index,
+                _active_card
+            )) {
+                _draw_raidability_line(
+                    _active_bounds.x,
+                    _active_bounds.y - 5,
+                    _active_bounds.width
+                );
+            }
 
             _add_hit_region(
                 _zone_kind,
@@ -3299,25 +3433,23 @@ function loc_draw() {
                 _active_bounds.x,
                 _active_bounds.y,
                 _active_bounds.width,
-                _active_bounds.height
+                _active_bounds.height + _active_card.ui_commit_lift
             );
             if (!is_undefined(pending_choice)
             && (pending_choice.kind == "ability_target"
+                && !_is_multi_select_choice()
                 && can_resolve_ability_target(
                     pending_choice,
                     get_raid_source_kind(_zone_kind, _active_card),
                     _logical_zone_index
                 )
                 || pending_choice.kind == "space_pirate_ready"
-                && pending_choice.owner_index == game_state.active_player
+                && pending_choice.owner_index == game_state.view_player
                 && _zone_kind == "character"
                 && !_active_card.ready
                 && card_has_faction(_active_card, "SP")
-                || pending_choice.kind == "breach_character"
-                && pending_choice.player_index == game_state.active_player
-                && _zone_kind == "character"
                 || pending_choice.kind == "olympus_ready"
-                && pending_choice.player_index == game_state.active_player
+                && pending_choice.player_index == game_state.view_player
                 && _zone_kind == "character"
                 && !_active_card.ready
                 && card_has_faction(_active_card, "GF")
@@ -3335,10 +3467,11 @@ function loc_draw() {
                 );
             }
 
-            if ((ui_selected_kind == _zone_kind
+            if (!_is_commitment_choice()
+            && ((ui_selected_kind == _zone_kind
             && _logical_zone_index == ui_selected_index)
             || (ui_hover_kind == _zone_kind
-            && _logical_zone_index == ui_hover_index)) {
+            && _logical_zone_index == ui_hover_index))) {
                 _draw_selection(
                     _active_bounds.x,
                     _active_bounds.y,
@@ -3346,29 +3479,6 @@ function loc_draw() {
                     _active_bounds.height,
                     ui_selected_kind == _zone_kind
                     && _logical_zone_index == ui_selected_index
-                );
-            }
-            if (!is_undefined(pending_choice)
-            && pending_choice.kind == "raid"
-            && _active_card.controller == game_state.priority_player
-            && (pending_choice.stage == "attackers"
-                || pending_choice.stage == "defenders")) {
-                var _active_raid_source_kind = get_raid_source_kind(
-                    _zone_kind,
-                    _active_card
-                );
-                draw_set_color(
-                    pending_choice.ability_source_kind == _active_raid_source_kind
-                    && pending_choice.ability_source_index == _logical_zone_index
-                        ? ui_color_selected
-                        : ui_color_success
-                );
-                draw_rectangle(
-                    _active_bounds.x - 3,
-                    _active_bounds.y - 3,
-                    _active_bounds.x + _active_bounds.width + 3,
-                    _active_bounds.y + _active_bounds.height + 3,
-                    true
                 );
             }
 
@@ -4390,6 +4500,9 @@ function loc_draw() {
                     1
                 );
             }
+            if (_card_is_removal_choice("hand", _hand_index, _hand_card)) {
+                _draw_raidability_line(_hand_x, _hand_y - 5, _hand_card_w);
+            }
             _add_hit_region(
                 "hand",
                 _hand_index,
@@ -4506,6 +4619,11 @@ function loc_draw() {
         ui_context_preview_kind = "";
         ui_context_preview_index = -1;
         ui_context_preview_until_ms = 0;
+        // Raid context menus follow hover only, not the committed selection.
+        if (_raid_hover_context) {
+            ui_selected_kind = "";
+            ui_selected_index = -1;
+        }
     }
 
     var _selected_instance = undefined;
@@ -5191,6 +5309,15 @@ function loc_draw() {
             var _raid_region = ui_hit_regions[_raid_region_index];
             if (_raid_region.kind != "opponent_ship"
             || is_undefined(_raid_region.instance)) continue;
+            var _target_raid_action = "raid_target_"
+                + string(_raid_region.index);
+            var _target_raid_hovered =
+                (ui_hover_kind == "opponent_ship"
+                    && ui_hover_index == _raid_region.index)
+                || ((ui_hover_kind == "action"
+                    || ui_hover_kind == "context_bridge")
+                    && ui_hover_index == _target_raid_action);
+            if (!_target_raid_hovered) continue;
             var _target_raid_cost = get_raid_cost(
                 _active_player,
                 _raid_region.instance
@@ -5204,16 +5331,24 @@ function loc_draw() {
             var _target_raid_x = (_raid_region.x1 + _raid_region.x2
                 - _target_raid_width) * 0.5;
             var _target_raid_y = _raid_region.y2 + 10;
-            if (_target_raid_affordable) {
-                _draw_raidability_line(
-                    _raid_region.x1,
-                    _raid_region.y2 + 5,
-                    _raid_region.x2 - _raid_region.x1
-                );
-            }
+            // Keeps the button open while the pointer crosses the gap to it.
+            array_push(ui_hit_regions, {
+                kind: "context_bridge",
+                index: _target_raid_action,
+                instance: undefined,
+                x1: _target_raid_x,
+                y1: _raid_region.y2,
+                x2: _target_raid_x + _target_raid_width,
+                y2: _target_raid_y,
+                enabled: false,
+                action: "",
+                context_kind: "",
+                context_index: -1,
+                context_instance: undefined
+            });
             _draw_action_button(
                 "RAID - " + string(_target_raid_cost) + " CP",
-                "raid_target_" + string(_raid_region.index),
+                _target_raid_action,
                 _target_raid_x,
                 _target_raid_y,
                 _target_raid_width,
@@ -5278,20 +5413,16 @@ function loc_draw() {
                 if (_selected_instance.definition.type == "character"
                 && _selected_instance.ready) _context_button_rows += 1;
                 if (can_salvage_permanent(
-                    ui_selected_kind,
+                    get_rules_kind(ui_selected_kind),
                     ui_selected_index
                 )) _context_button_rows += 1;
                 _context_button_rows = max(1, _context_button_rows);
             } else if (game_state.phase == "containment") {
                 _context_button_rows = max(
                     1,
-                    ceil(
-                        min(
-                            3,
-                            array_length(
-                                get_activated_abilities(_selected_instance)
-                            )
-                        ) / 2
+                    min(
+                        3,
+                        array_length(get_activated_abilities(_selected_instance))
                     )
                 );
             } else if (ui_selected_kind == "ship") {
@@ -5615,7 +5746,7 @@ function loc_draw() {
             // The mandatory Shop search is presented in its own card browser.
         } else if (pending_choice.kind == "special_containment_ship") {
             var _special_ship_kind =
-                pending_choice.player_index == game_state.active_player
+                pending_choice.player_index == game_state.view_player
                     ? "ship"
                     : "opponent_ship";
             var _special_ship_legal =
@@ -6085,18 +6216,12 @@ function loc_draw() {
                  _containment_ability_index
                     < min(3, array_length(_containment_abilities));
                  _containment_ability_index++) {
-                var _containment_ability_row =
-                    floor(_containment_ability_index / 2);
-                var _containment_ability_column =
-                    _containment_ability_index mod 2;
                 _draw_action_button(
                     _containment_abilities[_containment_ability_index].label,
                     "activate_" + string(_containment_ability_index),
-                    _containment_ability_column == 0
-                        ? _button_x1
-                        : _button_x2,
-                    _button_y + (_containment_ability_row * (_button_h + 8)),
-                    _button_w,
+                    _button_x1,
+                    _button_y + (_containment_ability_index * (_button_h + 8)),
+                    (_button_w * 2) + _button_gap,
                     _button_h,
                     can_activate_selected_ability(
                         ui_selected_kind,
@@ -9128,7 +9253,7 @@ function loc_draw() {
                             + "  /  "
                             + (_seat_occupant.ready ? "READY" : "NOT READY")
                     );
-                    if (_seat_occupant.id == net_local_participant_id) {
+                    if (_seat_occupant.participant_id == net_local_participant_id) {
                         _draw_action_button(
                             "DECK", "network_lobby_leader",
                             _lobby_x + _lobby_w - 202, _seat_y + 10,
@@ -9321,7 +9446,7 @@ function loc_draw() {
                     _tooltip_source = _tooltip_player.hand[_tooltip_context_index];
                 } else {
                     _tooltip_source = get_ability_source(
-                        _tooltip_context_kind,
+                        get_rules_kind(_tooltip_context_kind),
                         _tooltip_context_index
                     );
                 }

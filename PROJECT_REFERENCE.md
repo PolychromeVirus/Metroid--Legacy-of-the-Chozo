@@ -428,7 +428,10 @@ seed, both peers rebuild the same deterministic match, and
 the guest sends action intentions which the host validates and commits in
 sequence. Each installation keeps its local player's board and hand view fixed.
 Local test mutations and unsynchronized keyboard shortcuts are disabled during
-network matches. The main-menu player-name field supplies Player 1's name in
+network matches. Pending-choice clicks and gameplay buttons are resolved by shared
+handlers (`execute_choice_click`, `execute_ui_action`) in both local and network play. Interface zone
+kinds and selections are relative to the viewing player; they are converted to
+active-player-relative kinds (`get_rules_kind`) wherever they enter rules code. The main-menu player-name field supplies Player 1's name in
 solo, hotseat, and hosted games. Joining players may edit their name alongside
 the host address; both names are exchanged during the network handshake and
 used throughout the event log. Spectators have their own chat identity, cannot
@@ -1328,6 +1331,7 @@ instances and presentation assets. Its primary concepts are:
 - `ShipState`: cargo, base capacity of one, and capacity modifiers
 - `Effect`: costs, targets, conditions, resolution steps, and timing
 - `PendingChoice`: explicit player decision required to continue resolution
+- `GameEvent`: an auditable state-change record such as `CP_GAINED`, `CARD_EXHAUSTED`, `METROID_EVOLVED`, or `BREACH_OCCURRED`
 
 ### Runtime module layout
 
@@ -1360,7 +1364,6 @@ scripts. The extracted GameMaker script resources are:
 The module initializer order deliberately matches the former Create-event order,
 so existing instance-scoped functions and state retain their behavior while the
 large object event is reduced to explicit subsystem calls.
-- `GameEvent`: an auditable state-change record such as `CP_GAINED`, `CARD_EXHAUSTED`, `METROID_EVOLVED`, or `BREACH_OCCURRED`
 
 Random results, including first player, evolution rolls, and shuffles, use the
 shared seeded random state. AI mode randomizes its seed by default; recorded

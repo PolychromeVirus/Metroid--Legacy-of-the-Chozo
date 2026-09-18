@@ -397,7 +397,8 @@ function loc_abilities() {
             return !is_undefined(pending_choice)
                 && pending_choice.kind == "raid"
                 && pending_choice.stage == "defenders"
-                && game_state.priority_player == _source.controller;
+                && game_state.priority_player == _source.controller
+                && _controller.command_points >= _ability.cost_cp;
         }
         if (_ability.cost_exhaust && !_source.ready) {
             return false;
@@ -414,53 +415,9 @@ function loc_abilities() {
         if (_controller.command_points < _ability.cost_cp) {
             return false;
         }
-        if (_ability.target_kind == "ship"
-        && array_length(_controller.board.ships) <= 0) {
-            return false;
-        }
-        if (_ability.target_kind == "ready_ship") {
-            var _has_ready_ship = false;
-            for (var _ready_ship_index = 0;
-                 _ready_ship_index < array_length(_controller.board.ships);
-                 _ready_ship_index++) {
-                if (_controller.board.ships[_ready_ship_index].ready) {
-                    _has_ready_ship = true;
-                    break;
-                }
-            }
-            if (!_has_ready_ship) {
-                return false;
-            }
-        }
         if (_ability.target_kind == "dark_samus_character"
         && _source.phazon_tokens <= 0) {
             return false;
-        }
-        if (_ability.effect_kind == "teleport_metroid") {
-            var _has_teleport_pair = false;
-            for (var _teleport_source_index = 0;
-                 _teleport_source_index < array_length(_controller.board.ships);
-                 _teleport_source_index++) {
-                var _teleport_source =
-                    _controller.board.ships[_teleport_source_index];
-                if (array_length(_teleport_source.cargo) <= 0) continue;
-                for (var _teleport_target_index = 0;
-                     _teleport_target_index
-                        < array_length(_controller.board.ships);
-                     _teleport_target_index++) {
-                    var _teleport_target =
-                        _controller.board.ships[_teleport_target_index];
-                    if (_teleport_target.instance_id
-                    != _teleport_source.instance_id
-                    && card_has_faction(_teleport_target, "CZ")
-                    && array_length(_teleport_target.cargo) < 1) {
-                        _has_teleport_pair = true;
-                        break;
-                    }
-                }
-                if (_has_teleport_pair) break;
-            }
-            if (!_has_teleport_pair) return false;
         }
         if (_ability.effect_kind == "tyr_raid_support") {
             if (is_undefined(pending_choice)
@@ -476,60 +433,9 @@ function loc_abilities() {
             return !is_undefined(_tyr_defender)
                 && _tyr_defender.instance_id != _source.instance_id;
         }
-        if (_ability.target_kind == "own_phazon_source") {
-            var _phazon_zones = [
-                _controller.board.characters,
-                _controller.board.ships,
-                _controller.board.locations,
-                _controller.board.relics
-            ];
-            var _has_phazon_source = false;
-            for (var _phazon_zone_index = 0;
-                 _phazon_zone_index < array_length(_phazon_zones);
-                 _phazon_zone_index++) {
-                var _phazon_zone = _phazon_zones[_phazon_zone_index];
-                for (var _phazon_card_index = 0;
-                     _phazon_card_index < array_length(_phazon_zone);
-                     _phazon_card_index++) {
-                    var _phazon_card = _phazon_zone[_phazon_card_index];
-                    if (_phazon_card.instance_id != _source.instance_id
-                    && _phazon_card.phazon_tokens > 0) {
-                        _has_phazon_source = true;
-                        break;
-                    }
-                }
-                if (_has_phazon_source) break;
-            }
-            if (!_has_phazon_source) return false;
-        }
-        if (_ability.target_kind == "shop_ship") {
-            var _has_shop_ship = false;
-            for (var _shop_index = 0;
-                 _shop_index < array_length(game_state.shop_row);
-                 _shop_index++) {
-                if (game_state.shop_row[_shop_index].definition.type == "ship") {
-                    _has_shop_ship = true;
-                    break;
-                }
-            }
-            if (!_has_shop_ship) {
-                return false;
-            }
-        }
-        if (_ability.target_kind == "shop_event") {
-            var _has_shop_event = false;
-            for (var _event_shop_index = 0;
-                 _event_shop_index < array_length(game_state.shop_row);
-                 _event_shop_index++) {
-                if (game_state.shop_row[_event_shop_index].definition.type
-                == "event") {
-                    _has_shop_event = true;
-                    break;
-                }
-            }
-            if (!_has_shop_event) {
-                return false;
-            }
+        if (_ability.target_kind != ""
+        && !ability_has_legal_target(_source_kind, _source_index, _ability)) {
+            return false;
         }
         return true;
     };
@@ -1250,6 +1156,57 @@ function loc_abilities() {
                 || _resolved;
         }
         return _resolved;
+    };
+
+    // True when at least one card satisfies the ability's targeting rules.
+    ability_has_legal_target = function(_source_kind, _source_index, _ability) {
+        var _source = get_ability_source(_source_kind, _source_index);
+        if (is_undefined(_source)) return false;
+        var _probe = {
+            kind: "ability_target",
+            source_kind: _source_kind,
+            source_index: _source_index,
+            source: _source,
+            ability: _ability,
+            target_kind: _ability.target_kind,
+            required_target_instance_id: -1,
+            prompt: "",
+            multi_select: _ability.effect_kind == "dark_samus_discard",
+            selected_targets: [],
+            selected_strength: 0,
+            selected_pz_bonus: 0
+        };
+        var _board_kinds = ["character", "ship", "location", "relic"];
+        for (var _side = 0; _side < 2; _side++) {
+            var _player = game_state.players[_side == 0
+                ? game_state.active_player
+                : 1 - game_state.active_player];
+            var _zones = [
+                _player.board.characters,
+                _player.board.ships,
+                _player.board.locations,
+                _player.board.relics
+            ];
+            for (var _zone = 0; _zone < array_length(_zones); _zone++) {
+                var _kind = (_side == 0 ? "" : "opponent_")
+                    + _board_kinds[_zone];
+                for (var _index = 0;
+                     _index < array_length(_zones[_zone]);
+                     _index++) {
+                    if (can_resolve_ability_target(_probe, _kind, _index)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        for (var _shop_index = 0;
+             _shop_index < array_length(game_state.shop_row);
+             _shop_index++) {
+            if (can_resolve_ability_target(_probe, "shop", _shop_index)) {
+                return true;
+            }
+        }
+        return false;
     };
 
     can_resolve_ability_target = function(_choice, _target_kind, _target_index) {

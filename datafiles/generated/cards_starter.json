@@ -7,7 +7,7 @@
   "copy_count": 10,
   "cards": [
     {
-      "id": "starter.ship_captain",
+      "definition_id": "starter.ship_captain",
       "set": "LOC",
       "pool": "starter",
       "count": 1,
@@ -39,7 +39,7 @@
       }
     },
     {
-      "id": "starter.sloop",
+      "definition_id": "starter.sloop",
       "set": "LOC",
       "pool": "starter",
       "count": 1,
@@ -71,7 +71,7 @@
       }
     },
     {
-      "id": "starter.orders_received",
+      "definition_id": "starter.orders_received",
       "set": "LOC",
       "pool": "starter",
       "count": 2,
@@ -103,7 +103,7 @@
       }
     },
     {
-      "id": "starter.researcher",
+      "definition_id": "starter.researcher",
       "set": "LOC",
       "pool": "starter",
       "count": 1,
@@ -135,7 +135,7 @@
       }
     },
     {
-      "id": "starter.private_military",
+      "definition_id": "starter.private_military",
       "set": "LOC",
       "pool": "starter",
       "count": 2,
@@ -167,7 +167,7 @@
       }
     },
     {
-      "id": "starter.budget_cuts",
+      "definition_id": "starter.budget_cuts",
       "set": "LOC",
       "pool": "starter",
       "count": 1,
@@ -199,7 +199,7 @@
       }
     },
     {
-      "id": "starter.away_team",
+      "definition_id": "starter.away_team",
       "set": "LOC",
       "pool": "starter",
       "count": 1,
@@ -231,7 +231,7 @@
       }
     },
     {
-      "id": "starter.military_rations",
+      "definition_id": "starter.military_rations",
       "set": "LOC",
       "pool": "starter",
       "count": 1,

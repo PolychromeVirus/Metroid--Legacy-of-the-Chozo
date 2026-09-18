@@ -10,6 +10,7 @@ function loc_step() {
         raid_suspended_choice = undefined;
         raid_validate_participants(pending_choice);
     }
+    network_send_debug_state();
 
     // Keep the application surface at one GUI pixel per window client pixel.
     // Resizing the window therefore reveals more or less of the camera viewport
@@ -803,7 +804,7 @@ function loc_step() {
         || ui_selected_kind == "location"
         || ui_selected_kind == "relic")) {
         var _guidance_ability_source = get_ability_source(
-            ui_selected_kind,
+            get_rules_kind(ui_selected_kind),
             ui_selected_index
         );
         if (!is_undefined(_guidance_ability_source)
@@ -1679,27 +1680,13 @@ function loc_step() {
             var _net_input_kind = _hover_region.kind;
             var _net_selected_kind = ui_selected_kind;
             var _net_selected_index = ui_selected_index;
-            if (_net_is_action
-            && variable_struct_exists(_hover_region, "context_kind")
-            && _hover_region.context_kind != "") {
-                _net_selected_kind = _hover_region.context_kind;
-                _net_selected_index = _hover_region.context_index;
+            if (_net_is_action) {
+                var _net_selection = get_action_selection(_hover_region);
+                _net_selected_kind = _net_selection.kind;
+                _net_selected_index = _net_selection.index;
             }
-            if (_net_is_choice
-            && pending_choice.kind == "raid"
-            && !is_undefined(_hover_region.instance)) {
-                _net_input_kind = get_raid_source_kind(
-                    _hover_region.kind,
-                    _hover_region.instance
-                );
-            } else if (_net_is_choice
-            && (pending_choice.kind == "chozo_ghosts_source"
-                || pending_choice.kind == "chozo_ghosts_target")
-            && !is_undefined(_hover_region.instance)) {
-                _net_input_kind = get_raid_source_kind(
-                    _hover_region.kind,
-                    _hover_region.instance
-                );
+            if (_net_is_choice) {
+                _net_input_kind = get_rules_kind(_hover_region.kind);
             }
             network_submit_input({
                 input_type: _net_is_action ? "action" : "click",
@@ -1730,7 +1717,8 @@ function loc_step() {
 
     if (mouse_check_button_pressed(mb_left)) {
         if (is_undefined(_hover_region)) {
-            if (is_undefined(pending_choice)) {
+            if (is_undefined(pending_choice)
+            && game_state.phase != "containment") {
                 ui_selected_kind = "";
                 ui_selected_index = -1;
             }
@@ -1741,37 +1729,7 @@ function loc_step() {
                     ui_selected_kind = _hover_region.context_kind;
                     ui_selected_index = _hover_region.context_index;
                 }
-                if (string_pos("back_in_day_pick_", _hover_region.action) == 1) {
-                    var _back_pick_text = string_delete(
-                        _hover_region.action,
-                        1,
-                        string_length("back_in_day_pick_")
-                    );
-                    resolve_back_in_the_day_choice(real(_back_pick_text));
-                } else if (string_pos("raid_target_", _hover_region.action) == 1) {
-                    var _raid_target_text = string_delete(
-                        _hover_region.action,
-                        1,
-                        string_length("raid_target_")
-                    );
-                    begin_raid_target_choice(real(_raid_target_text));
-                } else switch (_hover_region.action) {
-                    case "advance_phase":
-                        advance_game_phase();
-                        break;
-
-                    case "containment_no_ship":
-                        resolve_turn_containment(-1);
-                        break;
-
-                    case "containment_use_ship":
-                        resolve_turn_containment(ui_selected_index);
-                        break;
-
-                    case "end_turn":
-                        end_turn_action();
-                        break;
-
+                switch (_hover_region.action) {
                     case "camera_center_toggle":
                         board_camera_center_far = !board_camera_center_far;
                         board_camera_last_auto_focus = "";
@@ -1788,207 +1746,6 @@ function loc_step() {
                             board_camera_target_y = board_camera_y;
                             board_camera_target_zoom = board_camera_zoom;
                         }
-                        break;
-
-                    case "reserve":
-                        reserve_shop_card(ui_selected_index);
-                        break;
-
-                    case "deploy":
-                        deploy_shop_card(ui_selected_index);
-                        break;
-
-                    case "play":
-                        play_hand_card(ui_selected_index);
-                        break;
-
-                    case "capture":
-                        begin_capture_choice(ui_selected_index);
-                        break;
-
-                    case "raid":
-                        begin_raid_choice(ui_selected_index);
-                        break;
-
-                    case "back_in_day_prev":
-                        pending_choice.page = max(0, pending_choice.page - 1);
-                        break;
-
-                    case "back_in_day_next":
-                        pending_choice.page += 1;
-                        break;
-
-                    case "salvage":
-                        salvage_permanent(ui_selected_kind, ui_selected_index);
-                        break;
-
-                    case "lock_raid_attackers":
-                        lock_raid_attackers();
-                        break;
-
-                    case "resolve_raid":
-                        resolve_raid();
-                        break;
-
-                    case "raid_cargo_0":
-                        finish_attacker_raid_win(0);
-                        break;
-
-                    case "raid_cargo_1":
-                        finish_attacker_raid_win(1);
-                        break;
-
-                    case "raid_cargo_2":
-                        finish_attacker_raid_win(2);
-                        break;
-
-                    case "raid_cargo_3":
-                        finish_attacker_raid_win(3);
-                        break;
-
-                    case "raid_toggle_mode":
-                        toggle_raid_ability_mode();
-                        break;
-
-                    case "raid_contribute":
-                        var _raid_contribute_source = get_ability_source(
-                            ui_selected_kind, ui_selected_index
-                        );
-                        raid_contribute_selected(
-                            get_raid_source_kind(
-                                ui_selected_kind,
-                                _raid_contribute_source
-                            ),
-                            ui_selected_index
-                        );
-                        break;
-
-                    case "raid_activate":
-                        activate_raid_selected_ability();
-                        break;
-
-                    case "raid_use_0":
-                        var _raid_use_0_kind = variable_struct_exists(
-                            _hover_region, "context_kind"
-                        ) ? _hover_region.context_kind : ui_selected_kind;
-                        var _raid_use_0_index = variable_struct_exists(
-                            _hover_region, "context_index"
-                        ) ? _hover_region.context_index : ui_selected_index;
-                        var _raid_use_0_source = variable_struct_exists(
-                            _hover_region, "context_instance"
-                        ) && !is_undefined(_hover_region.context_instance)
-                            ? _hover_region.context_instance
-                            : get_ability_source(
-                                _raid_use_0_kind, _raid_use_0_index
-                            );
-                        activate_raid_ability_index(
-                            0,
-                            get_raid_source_kind(
-                                _raid_use_0_kind,
-                                _raid_use_0_source
-                            ),
-                            _raid_use_0_index
-                        );
-                        break;
-
-                    case "raid_use_1":
-                        var _raid_use_1_kind = variable_struct_exists(
-                            _hover_region, "context_kind"
-                        ) ? _hover_region.context_kind : ui_selected_kind;
-                        var _raid_use_1_index = variable_struct_exists(
-                            _hover_region, "context_index"
-                        ) ? _hover_region.context_index : ui_selected_index;
-                        var _raid_use_1_source = variable_struct_exists(
-                            _hover_region, "context_instance"
-                        ) && !is_undefined(_hover_region.context_instance)
-                            ? _hover_region.context_instance
-                            : get_ability_source(
-                                _raid_use_1_kind, _raid_use_1_index
-                            );
-                        activate_raid_ability_index(
-                            1,
-                            get_raid_source_kind(
-                                _raid_use_1_kind,
-                                _raid_use_1_source
-                            ),
-                            _raid_use_1_index
-                        );
-                        break;
-
-                    case "raid_use_2":
-                        var _raid_use_2_kind = variable_struct_exists(
-                            _hover_region, "context_kind"
-                        ) ? _hover_region.context_kind : ui_selected_kind;
-                        var _raid_use_2_index = variable_struct_exists(
-                            _hover_region, "context_index"
-                        ) ? _hover_region.context_index : ui_selected_index;
-                        var _raid_use_2_source = variable_struct_exists(
-                            _hover_region, "context_instance"
-                        ) && !is_undefined(_hover_region.context_instance)
-                            ? _hover_region.context_instance
-                            : get_ability_source(
-                                _raid_use_2_kind, _raid_use_2_index
-                            );
-                        activate_raid_ability_index(
-                            2,
-                            get_raid_source_kind(
-                                _raid_use_2_kind,
-                                _raid_use_2_source
-                            ),
-                            _raid_use_2_index
-                        );
-                        break;
-
-                    case "resolve_queen":
-                        resolve_queen_shop_event();
-                        break;
-
-                    case "finish_queen":
-                        finish_queen_shop_event();
-                        break;
-
-                    case "special_containment_no_ship":
-                        choose_special_containment_ship(-1);
-                        break;
-
-                    case "special_containment_use_ship":
-                        choose_special_containment_ship(ui_selected_index);
-                        break;
-
-                    case "adam_prevent_breach":
-                        resolve_adam_breach_choice(true);
-                        break;
-
-                    case "adam_allow_breach":
-                        resolve_adam_breach_choice(false);
-                        break;
-
-                    case "space_pirate_pay":
-                        resolve_space_pirate_payment(true);
-                        break;
-
-                    case "space_pirate_decline":
-                        resolve_space_pirate_payment(false);
-                        break;
-
-                    case "faction_gf":
-                        resolve_faction_choice("GF");
-                        break;
-
-                    case "faction_sp":
-                        resolve_faction_choice("SP");
-                        break;
-
-                    case "faction_cz":
-                        resolve_faction_choice("CZ");
-                        break;
-
-                    case "faction_bh":
-                        resolve_faction_choice("BH");
-                        break;
-
-                    case "faction_pz":
-                        resolve_faction_choice("PZ");
                         break;
 
                     case "test_open":
@@ -2027,50 +1784,6 @@ function loc_step() {
                         handle_test_tool_action(_hover_region.action);
                         break;
 
-                    case "activate_0":
-                        activate_selected_ability(
-                            ui_selected_kind,
-                            ui_selected_index,
-                            0
-                        );
-                        break;
-
-                    case "activate_1":
-                        activate_selected_ability(
-                            ui_selected_kind,
-                            ui_selected_index,
-                            1
-                        );
-                        break;
-
-                    case "activate_2":
-                        activate_selected_ability(
-                            ui_selected_kind,
-                            ui_selected_index,
-                            2
-                        );
-                        break;
-
-                    case "refresh_hand":
-                        begin_hand_refresh_choice();
-                        break;
-
-                    case "confirm_hand_refresh":
-                        confirm_hand_refresh_choice();
-                        break;
-
-                    case "confirm_dark_samus_discard":
-                        confirm_dark_samus_discard();
-                        break;
-
-                    case "refresh_shop":
-                        refresh_shop_action();
-                        break;
-
-                    case "cancel":
-                        cancel_pending_choice();
-                        break;
-
                     case "restart":
                         room_restart();
                         break;
@@ -2090,6 +1803,17 @@ function loc_step() {
                     case "title_ai_watch":
                         start_game_mode("ai_watch");
                         break;
+
+                    default:
+                        var _action_selection = get_action_selection(
+                            _hover_region
+                        );
+                        execute_ui_action(
+                            _hover_region.action,
+                            _action_selection.kind,
+                            _action_selection.index
+                        );
+                        break;
                 }
                 // Buttons consume the selection they acted on. Any follow-up
                 // choice carries its own source data in pending_choice.
@@ -2100,19 +1824,6 @@ function loc_step() {
                 ui_context_preview_index = -1;
                 ui_context_preview_until_ms = 0;
             }
-        } else if (!is_undefined(pending_choice)
-        && pending_choice.kind == "raid"
-        && pending_choice.stage == "attacker_ship"
-        && _hover_region.kind == "ship") {
-            select_raid_attacker(_hover_region.index);
-        } else if (!is_undefined(pending_choice)
-        && pending_choice.kind == "hand_refresh"
-        && _hover_region.kind == "hand") {
-            toggle_hand_refresh_card(_hover_region.index);
-        } else if (!is_undefined(pending_choice)
-        && pending_choice.kind == "torizo_metroid"
-        && _hover_region.kind == "lab") {
-            resolve_torizo_metroid_choice(_hover_region.index);
         } else if (_hover_region.kind == "lab_tab") {
             if (ui_selected_kind == "lab_tab") {
                 ui_selected_kind = "";
@@ -2131,136 +1842,25 @@ function loc_step() {
                 ui_selected_index = 0;
                 ui_selected_instance_id = -1;
             }
-        } else if (!is_undefined(pending_choice)
-        && pending_choice.kind == "chozo_ghosts_source"
-        && !is_undefined(_hover_region.instance)) {
-            resolve_chozo_ghosts_source(_hover_region.instance);
-        } else if (!is_undefined(pending_choice)
-        && pending_choice.kind == "chozo_ghosts_target"
-        && !is_undefined(_hover_region.instance)) {
-            resolve_chozo_ghosts_target(_hover_region.instance);
-        } else if (!is_undefined(pending_choice)
-        && pending_choice.kind == "breach_character"
-        && ((_hover_region.kind == "character"
-            && pending_choice.player_index == game_state.active_player)
-            || (_hover_region.kind == "opponent_character"
-            && pending_choice.player_index != game_state.active_player))) {
-            resolve_breach_character_choice(_hover_region.index);
-        } else if (!is_undefined(pending_choice)
-        && pending_choice.kind == "olympus_ready"
-        && ((_hover_region.kind == "character"
-            && pending_choice.player_index == game_state.active_player)
-            || (_hover_region.kind == "opponent_character"
-            && pending_choice.player_index != game_state.active_player))) {
-            resolve_olympus_ready_choice(_hover_region.index);
-        } else if (!is_undefined(pending_choice)
-        && pending_choice.kind == "hyper_mode_character"
-        && ((_hover_region.kind == "character"
-            && pending_choice.player_index == game_state.active_player)
-            || (_hover_region.kind == "opponent_character"
-            && pending_choice.player_index != game_state.active_player))) {
-            resolve_hyper_mode_character(_hover_region.index);
-        } else if (!is_undefined(pending_choice)
-        && pending_choice.kind == "researcher_discard"
-        && _hover_region.kind == "hand") {
-            resolve_researcher_discard(_hover_region.index);
-        } else if (!is_undefined(pending_choice)
-        && pending_choice.kind == "special_containment_ship"
-        && ((_hover_region.kind == "ship"
-            && pending_choice.player_index == game_state.active_player)
-            || (_hover_region.kind == "opponent_ship"
-            && pending_choice.player_index != game_state.active_player))) {
-            ui_selected_kind = _hover_region.kind;
-            ui_selected_index = _hover_region.index;
-            ui_selected_instance_id = is_undefined(_hover_region.instance)
-                ? -1
-                : _hover_region.instance.instance_id;
-        } else if (!is_undefined(pending_choice)
-        && pending_choice.kind == "raid"
-        && pending_choice.stage == "target"
-        && (_hover_region.kind == "opponent_ship"
-        || _hover_region.kind == "opponent_cargo")) {
-            select_raid_target(_hover_region.index);
-        } else if (!is_undefined(pending_choice)
-        && pending_choice.kind == "raid"
-        && !is_undefined(_hover_region.instance)
-        && _hover_region.instance.controller == game_state.priority_player
-        && (_hover_region.kind == "character"
-            || _hover_region.kind == "ship"
-            || _hover_region.kind == "location"
-            || _hover_region.kind == "relic"
-            || _hover_region.kind == "opponent_character"
-            || _hover_region.kind == "opponent_ship"
-            || _hover_region.kind == "opponent_location"
-            || _hover_region.kind == "opponent_relic")) {
-            var _clicked_raid_source_kind = get_raid_source_kind(
-                _hover_region.kind,
+        } else if (!is_undefined(pending_choice)) {
+            execute_choice_click(
+                get_rules_kind(_hover_region.kind),
+                _hover_region.index,
                 _hover_region.instance
             );
-            select_raid_ability_source(
-                _clicked_raid_source_kind,
-                _hover_region.index
-            );
-            if (_hover_region.instance.definition.type == "character") {
-                raid_contribute_selected(
-                    _clicked_raid_source_kind,
-                    _hover_region.index
-                );
+        } else if (game_state.phase == "containment") {
+            // Containment Ship selection toggles on the Ship itself or moves to
+            // another Ship; other clicks leave it alone.
+            if (_hover_region.kind == "ship") {
+                var _containment_deselect = ui_selected_kind == "ship"
+                    && ui_selected_index == _hover_region.index;
+                ui_selected_kind = _containment_deselect ? "" : "ship";
+                ui_selected_index = _containment_deselect
+                    ? -1 : _hover_region.index;
+                ui_selected_instance_id = _containment_deselect
+                    ? -1 : _hover_region.instance.instance_id;
             }
-        } else if (!is_undefined(pending_choice)
-        && pending_choice.kind == "ability_target") {
-            var _ability_target_kind = _hover_region.kind;
-            if (!is_undefined(_hover_region.instance)
-            && (_hover_region.kind == "character"
-                || _hover_region.kind == "ship"
-                || _hover_region.kind == "location"
-                || _hover_region.kind == "relic"
-                || _hover_region.kind == "opponent_character"
-                || _hover_region.kind == "opponent_ship"
-                || _hover_region.kind == "opponent_location"
-                || _hover_region.kind == "opponent_relic")) {
-                _ability_target_kind = get_raid_source_kind(
-                    _hover_region.kind, _hover_region.instance
-                );
-            }
-            if (resolve_ability_target_choice(
-                _ability_target_kind,
-                _hover_region.index
-            )) {
-                ui_selected_kind = "";
-                ui_selected_index = -1;
-            }
-        } else if (!is_undefined(pending_choice)
-        && pending_choice.kind == "teleport_destination"
-        && (_hover_region.kind == "ship"
-            || _hover_region.kind == "opponent_ship")) {
-            resolve_teleport_destination_choice(
-                _hover_region.kind,
-                _hover_region.index
-            );
-        } else if (!is_undefined(pending_choice)
-        && pending_choice.kind == "quiet_robe_metroids"
-        && _hover_region.kind == "metroid") {
-            resolve_quiet_robe_metroid_choice(_hover_region.index);
-        } else if (!is_undefined(pending_choice)
-        && pending_choice.kind == "space_pirate_ready") {
-            resolve_space_pirate_ready(
-                _hover_region.kind,
-                _hover_region.index
-            );
-        } else if (!is_undefined(pending_choice)
-        && pending_choice.kind == "capture_metroid"
-        && _hover_region.kind == "metroid") {
-            selected_metroid_source = _hover_region.index;
-            if (capture_metroid_action(
-                pending_choice.ship_index,
-                selected_metroid_source
-            )) {
-                pending_choice = undefined;
-                ui_selected_kind = "";
-                ui_selected_index = -1;
-            }
-        } else if (is_undefined(pending_choice)) {
+        } else {
             ui_selected_kind = _hover_region.kind;
             ui_selected_index = _hover_region.index;
             ui_selected_instance_id = is_undefined(_hover_region.instance)
@@ -2300,8 +1900,8 @@ function loc_step() {
     // leaves its zone, do not let selection silently transfer to its replacement.
     if (ui_selected_instance_id >= 0 && ui_selected_kind != "") {
         var _selected_current = undefined;
-        var _selected_player = game_state.players[game_state.active_player];
-        var _selected_opponent = game_state.players[1 - game_state.active_player];
+        var _selected_player = game_state.players[game_state.view_player];
+        var _selected_opponent = game_state.players[1 - game_state.view_player];
         switch (ui_selected_kind) {
             case "shop":
                 if (ui_selected_index < array_length(game_state.shop_row)) {

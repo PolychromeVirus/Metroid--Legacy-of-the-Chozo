@@ -88,7 +88,7 @@ function loc_regression() {
             _reset();
             var _relic_player = game_state.players[0];
             var _relic_definition = variable_clone(get_card_definition("loc.gray_voice"));
-            _relic_definition.id = "test.relic";
+            _relic_definition.definition_id = "test.relic";
             _relic_definition.name = "Test Relic";
             _relic_definition.type = "relic";
             var _relic = make_card_instance(_relic_definition, 0, "hand");

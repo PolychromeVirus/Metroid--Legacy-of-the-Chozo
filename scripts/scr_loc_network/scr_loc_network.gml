@@ -149,7 +149,7 @@ function loc_network() {
              _index++) {
             var _participant = net_lobby_participants[_index];
             array_push(_result, {
-                id: _participant.id,
+                participant_id: _participant.participant_id,
                 name: _participant.name,
                 seat: _participant.seat,
                 leader_id: _participant.leader_id,
@@ -170,7 +170,8 @@ function loc_network() {
         for (var _index = 0;
              _index < array_length(net_lobby_participants);
              _index++) {
-            if (net_lobby_participants[_index].id == _participant_id) {
+            if (net_lobby_participants[_index].participant_id
+            == _participant_id) {
                 return _index;
             }
         }
@@ -258,7 +259,7 @@ function loc_network() {
         net_local_participant_id = 0;
         net_next_participant_id = 1;
         net_lobby_participants = [{
-            id: 0,
+            participant_id: 0,
             name: net_player_name,
             seat: 0,
             leader_id: net_leader_id,
@@ -371,93 +372,183 @@ function loc_network() {
         return game_state.priority_player;
     };
 
-    network_execute_input = function(_input) {
-        ui_selected_kind = _input.selected_kind;
-        ui_selected_index = _input.selected_index;
-        if (_input.input_type == "click") {
-            var _kind = _input.kind;
-            var _index = _input.index;
-            if (is_undefined(pending_choice)) {
-                return false;
-            }
-            switch (pending_choice.kind) {
-                case "breach_character":
-                    if (_kind != "character"
-                    && _kind != "opponent_character") return false;
-                    return resolve_breach_character_choice(_index);
-                case "olympus_ready":
-                    if (_kind != "character"
-                    && _kind != "opponent_character") return false;
-                    return resolve_olympus_ready_choice(_index);
-                case "researcher_discard":
-                    if (_kind != "hand") return false;
-                    return resolve_researcher_discard(_index);
-                case "raid":
-                    if (pending_choice.stage == "attacker_ship") {
-                        if (_kind != "ship") return false;
-                        return select_raid_attacker(_index);
-                    } else if (pending_choice.stage == "target") {
-                        return select_raid_target(_index);
-                    }
-                    return select_raid_ability_source(_kind, _index);
-                case "ability_target":
-                    return resolve_ability_target_choice(_kind, _index);
-                case "quiet_robe_metroids":
-                    if (_kind != "metroid") return false;
-                    return resolve_quiet_robe_metroid_choice(_index);
-                case "torizo_metroid":
-                    if (_kind != "lab") return false;
-                    return resolve_torizo_metroid_choice(_index);
-                case "hyper_mode_character":
-                    if (_kind != "character"
-                    && _kind != "opponent_character") return false;
-                    return resolve_hyper_mode_character(_index);
-                case "space_pirate_ready":
-                    return resolve_space_pirate_ready(_kind, _index);
-                case "capture_metroid":
-                    if (_kind != "metroid") return false;
-                    var _captured = capture_metroid_action(
-                        pending_choice.ship_index,
-                        _index
-                    );
-                    if (_captured) {
-                        pending_choice = undefined;
-                        ui_selected_kind = "";
-                        ui_selected_index = -1;
-                    }
-                    return _captured;
-                case "hand_refresh":
-                    if (_kind != "hand") return false;
-                    return toggle_hand_refresh_card(_index);
-                case "chozo_ghosts_source":
-                    return resolve_chozo_ghosts_source(
-                        get_ability_source(_kind, _index)
-                    );
-                case "chozo_ghosts_target":
-                    return resolve_chozo_ghosts_target(
-                        get_ability_source(_kind, _index)
-                    );
-            }
+    // UI kinds are view-relative; rules kinds are active-player-relative.
+    get_rules_kind = function(_kind) {
+        if (game_state.view_player == game_state.active_player) return _kind;
+        switch (_kind) {
+            case "character":
+            case "ship":
+            case "location":
+            case "relic":
+            case "attachment":
+            case "cargo":
+                return "opponent_" + _kind;
+            case "opponent_character":
+            case "opponent_ship":
+            case "opponent_location":
+            case "opponent_relic":
+            case "opponent_attachment":
+            case "opponent_cargo":
+                return string_delete(_kind, 1, 9);
+        }
+        return _kind;
+    };
+
+    get_view_kind = function(_kind) {
+        return get_rules_kind(_kind);
+    };
+
+    // Shared by local and network choice clicks. Expects a rules kind.
+    execute_choice_click = function(_kind, _index, _instance) {
+        if (is_undefined(pending_choice)) {
             return false;
         }
+        switch (pending_choice.kind) {
+            case "breach_character":
+            case "olympus_ready":
+            case "hyper_mode_character":
+                var _expected_character_kind =
+                    pending_choice.player_index == game_state.active_player
+                        ? "character" : "opponent_character";
+                if (_kind != _expected_character_kind) return false;
+                if (pending_choice.kind == "breach_character") {
+                    return resolve_breach_character_choice(_index);
+                }
+                if (pending_choice.kind == "olympus_ready") {
+                    return resolve_olympus_ready_choice(_index);
+                }
+                return resolve_hyper_mode_character(_index);
 
-        if (string_pos("back_in_day_pick_", _input.action) == 1) {
+            case "special_containment_ship":
+                var _expected_ship_kind =
+                    pending_choice.player_index == game_state.active_player
+                        ? "ship" : "opponent_ship";
+                if (_kind != _expected_ship_kind) return false;
+                var _special_ship = get_ability_source(_kind, _index);
+                var _special_deselect =
+                    ui_selected_kind == get_view_kind(_kind)
+                    && ui_selected_index == _index;
+                ui_selected_kind = _special_deselect
+                    ? "" : get_view_kind(_kind);
+                ui_selected_index = _special_deselect ? -1 : _index;
+                ui_selected_instance_id = _special_deselect
+                    || is_undefined(_special_ship)
+                    ? -1 : _special_ship.instance_id;
+                return true;
+
+            case "researcher_discard":
+                if (_kind != "hand") return false;
+                return resolve_researcher_discard(_index);
+
+            case "raid":
+                if (pending_choice.stage == "attacker_ship") {
+                    if (_kind != "ship") return false;
+                    return select_raid_attacker(_index);
+                }
+                if (pending_choice.stage == "target") {
+                    if (_kind != "opponent_ship"
+                    && _kind != "opponent_cargo") return false;
+                    return select_raid_target(_index);
+                }
+                var _raid_source = get_ability_source(_kind, _index);
+                if (is_undefined(_raid_source)
+                || _raid_source.controller != game_state.priority_player) {
+                    return false;
+                }
+                var _raid_selected = select_raid_ability_source(_kind, _index);
+                var _raid_contributed = false;
+                if (_raid_source.definition.type == "character") {
+                    _raid_contributed = raid_contribute_selected(_kind, _index);
+                }
+                return _raid_selected || _raid_contributed;
+
+            case "ability_target":
+                if (resolve_ability_target_choice(_kind, _index)) {
+                    ui_selected_kind = "";
+                    ui_selected_index = -1;
+                    return true;
+                }
+                return false;
+
+            case "teleport_destination":
+                if (_kind != "ship" && _kind != "opponent_ship") return false;
+                return resolve_teleport_destination_choice(_kind, _index);
+
+            case "quiet_robe_metroids":
+                if (_kind != "metroid") return false;
+                return resolve_quiet_robe_metroid_choice(_index);
+
+            case "torizo_metroid":
+                if (_kind != "lab") return false;
+                return resolve_torizo_metroid_choice(_index);
+
+            case "space_pirate_ready":
+                return resolve_space_pirate_ready(_kind, _index);
+
+            case "capture_metroid":
+                if (_kind != "metroid") return false;
+                selected_metroid_source = _index;
+                var _captured = capture_metroid_action(
+                    pending_choice.ship_index,
+                    _index
+                );
+                if (_captured) {
+                    pending_choice = undefined;
+                    ui_selected_kind = "";
+                    ui_selected_index = -1;
+                }
+                return _captured;
+
+            case "hand_refresh":
+                if (_kind != "hand") return false;
+                return toggle_hand_refresh_card(_index);
+
+            case "chozo_ghosts_source":
+                return resolve_chozo_ghosts_source(
+                    is_undefined(_instance)
+                        ? get_ability_source(_kind, _index) : _instance
+                );
+
+            case "chozo_ghosts_target":
+                return resolve_chozo_ghosts_target(
+                    is_undefined(_instance)
+                        ? get_ability_source(_kind, _index) : _instance
+                );
+        }
+        return false;
+    };
+
+    // Source card for an action button: its context card, else the selection.
+    get_action_selection = function(_region) {
+        var _kind = ui_selected_kind;
+        var _index = ui_selected_index;
+        if (variable_struct_exists(_region, "context_kind")
+        && _region.context_kind != "") {
+            _kind = _region.context_kind;
+            _index = _region.context_index;
+        }
+        return { kind: get_rules_kind(_kind), index: _index };
+    };
+
+    // Shared by local and network gameplay buttons.
+    execute_ui_action = function(_action, _selected_kind, _selected_index) {
+        if (string_pos("back_in_day_pick_", _action) == 1) {
             var _back_pick_text = string_delete(
-                _input.action,
+                _action,
                 1,
                 string_length("back_in_day_pick_")
             );
             return resolve_back_in_the_day_choice(real(_back_pick_text));
         }
-        if (string_pos("raid_target_", _input.action) == 1) {
+        if (string_pos("raid_target_", _action) == 1) {
             var _raid_target_text = string_delete(
-                _input.action,
+                _action,
                 1,
                 string_length("raid_target_")
             );
             return begin_raid_target_choice(real(_raid_target_text));
         }
-        switch (_input.action) {
+        switch (_action) {
             case "back_in_day_prev":
                 pending_choice.page = max(0, pending_choice.page - 1);
                 return true;
@@ -467,18 +558,15 @@ function loc_network() {
             case "advance_phase": return advance_game_phase();
             case "containment_no_ship": return resolve_turn_containment(-1);
             case "containment_use_ship":
-                return resolve_turn_containment(_input.selected_index);
+                return resolve_turn_containment(_selected_index);
             case "end_turn": return end_turn_action();
-            case "reserve": return reserve_shop_card(_input.selected_index);
-            case "deploy": return deploy_shop_card(_input.selected_index);
-            case "play": return play_hand_card(_input.selected_index);
+            case "reserve": return reserve_shop_card(_selected_index);
+            case "deploy": return deploy_shop_card(_selected_index);
+            case "play": return play_hand_card(_selected_index);
             case "salvage":
-                return salvage_permanent(
-                    _input.selected_kind,
-                    _input.selected_index
-                );
-            case "capture": return begin_capture_choice(_input.selected_index);
-            case "raid": return begin_raid_choice(_input.selected_index);
+                return salvage_permanent(_selected_kind, _selected_index);
+            case "capture": return begin_capture_choice(_selected_index);
+            case "raid": return begin_raid_choice(_selected_index);
             case "lock_raid_attackers": return lock_raid_attackers();
             case "resolve_raid": return resolve_raid();
             case "raid_cargo_0": return finish_attacker_raid_win(0);
@@ -487,24 +575,24 @@ function loc_network() {
             case "raid_cargo_3": return finish_attacker_raid_win(3);
             case "raid_toggle_mode": return toggle_raid_ability_mode();
             case "raid_contribute": return raid_contribute_selected(
-                _input.selected_kind, _input.selected_index
+                _selected_kind, _selected_index
             );
             case "raid_activate": return activate_raid_selected_ability();
             case "raid_use_0": return activate_raid_ability_index(
-                0, _input.selected_kind, _input.selected_index
+                0, _selected_kind, _selected_index
             );
             case "raid_use_1": return activate_raid_ability_index(
-                1, _input.selected_kind, _input.selected_index
+                1, _selected_kind, _selected_index
             );
             case "raid_use_2": return activate_raid_ability_index(
-                2, _input.selected_kind, _input.selected_index
+                2, _selected_kind, _selected_index
             );
             case "resolve_queen": return resolve_queen_shop_event();
             case "finish_queen": return finish_queen_shop_event();
             case "special_containment_no_ship":
                 return choose_special_containment_ship(-1);
             case "special_containment_use_ship":
-                return choose_special_containment_ship(_input.selected_index);
+                return choose_special_containment_ship(_selected_index);
             case "adam_prevent_breach":
                 return resolve_adam_breach_choice(true);
             case "adam_allow_breach":
@@ -520,20 +608,20 @@ function loc_network() {
             case "faction_pz": return resolve_faction_choice("PZ");
             case "activate_0":
                 return activate_selected_ability(
-                    _input.selected_kind,
-                    _input.selected_index,
+                    _selected_kind,
+                    _selected_index,
                     0
                 );
             case "activate_1":
                 return activate_selected_ability(
-                    _input.selected_kind,
-                    _input.selected_index,
+                    _selected_kind,
+                    _selected_index,
                     1
                 );
             case "activate_2":
                 return activate_selected_ability(
-                    _input.selected_kind,
-                    _input.selected_index,
+                    _selected_kind,
+                    _selected_index,
                     2
                 );
             case "refresh_hand": return begin_hand_refresh_choice();
@@ -544,6 +632,56 @@ function loc_network() {
             case "cancel": return cancel_pending_choice();
         }
         return false;
+    };
+
+    network_execute_input = function(_input) {
+        if (_input.input_type == "click") {
+            return execute_choice_click(_input.kind, _input.index, undefined);
+        }
+        return execute_ui_action(
+            _input.action,
+            _input.selected_kind,
+            _input.selected_index
+        );
+    };
+
+    // Debug-only summary a guest reports to scripted hosts (tools/net_host_bot.py).
+    network_send_debug_state = function() {
+        if (!settings_debug_mode
+        || net_role != "client"
+        || game_state.game_mode != "network") return false;
+        var _players = [];
+        for (var _player_index = 0;
+             _player_index < array_length(game_state.players);
+             _player_index++) {
+            var _player = game_state.players[_player_index];
+            array_push(_players, {
+                command_points: _player.command_points,
+                deck: array_length(_player.deck),
+                hand: array_length(_player.hand),
+                discard: array_length(_player.discard),
+                board: array_length(_player.board.characters)
+                    + array_length(_player.board.ships)
+                    + array_length(_player.board.locations)
+                    + array_length(_player.board.relics),
+                lab: array_length(_player.lab)
+            });
+        }
+        var _state = {
+            type: "debug_state",
+            sequence: net_last_applied_sequence,
+            turn: game_state.turn_number,
+            phase: game_state.phase,
+            active_player: game_state.active_player,
+            priority_player: game_state.priority_player,
+            pending_kind: is_undefined(pending_choice)
+                ? "" : pending_choice.kind,
+            players: _players
+        };
+        var _signature = json_stringify(_state);
+        if (_signature == net_debug_state_signature) return false;
+        net_debug_state_signature = _signature;
+        return network_send_message(net_socket, _state);
     };
 
     network_submit_input = function(_input) {

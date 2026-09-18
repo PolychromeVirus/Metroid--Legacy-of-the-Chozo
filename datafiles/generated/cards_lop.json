@@ -7,7 +7,7 @@
   "copy_count": 24,
   "cards": [
     {
-      "id": "lop.corrupt_rundas",
+      "definition_id": "lop.corrupt_rundas",
       "set": "LOP",
       "pool": "lop",
       "count": 2,
@@ -41,7 +41,7 @@
       }
     },
     {
-      "id": "lop.corrupt_gandrayda",
+      "definition_id": "lop.corrupt_gandrayda",
       "set": "LOP",
       "pool": "lop",
       "count": 2,
@@ -75,7 +75,7 @@
       }
     },
     {
-      "id": "lop.dark_samus",
+      "definition_id": "lop.dark_samus",
       "set": "LOP",
       "pool": "lop",
       "count": 2,
@@ -107,7 +107,7 @@
       }
     },
     {
-      "id": "lop.leviathan",
+      "definition_id": "lop.leviathan",
       "set": "LOP",
       "pool": "lop",
       "count": 2,
@@ -139,7 +139,7 @@
       }
     },
     {
-      "id": "lop.leviathan_battleship",
+      "definition_id": "lop.leviathan_battleship",
       "set": "LOP",
       "pool": "lop",
       "count": 4,
@@ -173,7 +173,7 @@
       }
     },
     {
-      "id": "lop.chozo_ghosts",
+      "definition_id": "lop.chozo_ghosts",
       "set": "LOP",
       "pool": "lop",
       "count": 2,
@@ -208,7 +208,7 @@
       }
     },
     {
-      "id": "lop.hive_mind_communication",
+      "definition_id": "lop.hive_mind_communication",
       "set": "LOP",
       "pool": "lop",
       "count": 2,
@@ -241,7 +241,7 @@
       }
     },
     {
-      "id": "lop.aurora_unit_217",
+      "definition_id": "lop.aurora_unit_217",
       "set": "LOP",
       "pool": "lop",
       "count": 2,
@@ -275,7 +275,7 @@
       }
     },
     {
-      "id": "lop.p_e_d_suit",
+      "definition_id": "lop.p_e_d_suit",
       "set": "LOP",
       "pool": "lop",
       "count": 4,
@@ -307,7 +307,7 @@
       }
     },
     {
-      "id": "lop.hyper_mode",
+      "definition_id": "lop.hyper_mode",
       "set": "LOP",
       "pool": "lop",
       "count": 2,

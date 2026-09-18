@@ -7,7 +7,7 @@
   "copy_count": 60,
   "metroids": [
     {
-      "id": "metroid.larva",
+      "definition_id": "metroid.larva",
       "set": "LOC",
       "count": 10,
       "alias": "Metroid Larva",
@@ -25,7 +25,7 @@
       }
     },
     {
-      "id": "metroid.alpha",
+      "definition_id": "metroid.alpha",
       "set": "LOC",
       "count": 10,
       "alias": "Alpha Metroid",
@@ -43,7 +43,7 @@
       }
     },
     {
-      "id": "metroid.gamma",
+      "definition_id": "metroid.gamma",
       "set": "LOC",
       "count": 10,
       "alias": "Gamma Metroid",
@@ -61,7 +61,7 @@
       }
     },
     {
-      "id": "metroid.zeta",
+      "definition_id": "metroid.zeta",
       "set": "LOC",
       "count": 10,
       "alias": "Zeta Metroid",
@@ -79,7 +79,7 @@
       }
     },
     {
-      "id": "metroid.omega",
+      "definition_id": "metroid.omega",
       "set": "LOC",
       "count": 10,
       "alias": "Omega Metroid",
@@ -97,7 +97,7 @@
       }
     },
     {
-      "id": "metroid.hunter",
+      "definition_id": "metroid.hunter",
       "set": "LOP",
       "count": 10,
       "alias": "Hunter Metroid",

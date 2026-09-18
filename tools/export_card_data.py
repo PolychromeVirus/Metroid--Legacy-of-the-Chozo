@@ -457,7 +457,7 @@ def export_card_sheet(
 
         cards.append(
             {
-                "id": card_id,
+                "definition_id": card_id,
                 "set": set_code,
                 "pool": config["pool"],
                 "count": count,
@@ -591,7 +591,7 @@ def export_metroids(
 
         metroids.append(
             {
-                "id": metroid_id,
+                "definition_id": metroid_id,
                 "set": normalize_text(cell_value(row, headers, "set")).upper(),
                 "count": count,
                 "alias": normalize_text(cell_value(row, headers, "alias")),
